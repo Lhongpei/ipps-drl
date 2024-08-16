@@ -1,0 +1,79 @@
+env_paras:
+  num_jobs: 5  # Number of jobs, taking effect during training
+  num_mas: 3  # Number of machines, taking effect during training
+  batch_size: 3  # Number of parallel instances during training
+  ope_feat_dim: 6  # Dimension of the raw feature vectors of operation nodes
+  ma_feat_dim: 3  # Dimension of the raw feature vectors of machine nodes
+  show_mode: print  # Result display mode (deprecated in the final experiment)
+  valid_batch_size: 20  # Number of instances in single validation set
+  is_greedy: false  # Whether to use the greedy algorithm to dispatch
+  proc_time_change_interval: 0
+  add_job_interval: 0
+  reward_info:
+    estimate: false  # false: real time makespan
+    ma_mean: false  # false: min
+    comb_mean: false  # false: min
+    job_mean: false  # false: max
+    balance_bonus: false
+
+train_paras:
+  lr: 5e-4  # learning rate
+  betas:
+    - 0.9  # paras for Adam (default value)
+    - 0.999
+  gamma: 0.99  # discount factor
+  K_epochs: 3  # Update policy for K epochs
+  eps_clip: 0.3  # clip ratio for PPO
+  clip_multi: 1.002
+  clip_ub: 0.5
+  A_coeff: 1.0  # coefficient for policy loss
+  vf_coeff: 0.5  # coefficient for value loss
+  entropy_coeff: 0.05 # coefficient for entropy term
+  entropy_discount: 0.997 # dicount every train step
+  max_iterations: 30000  # Maximum number of iterations for training
+  save_timestep: 10  # Number of iterations to validate and save the network
+  update_timestep: 5  # Number of iterations to update the network
+  minibatch_size: 512  # batch size for updating
+  parallel_iter: 20 # Number of iterations to replace training instances
+
+IL_paras:
+  save_timestep: 1
+  update_timestep: 1
+
+test_paras:
+  if_draw_gantt: false  # Draw Gantt chart or not
+  if_save_sols: true  # Save the solution or not
+  num_ins: 100  # Number of instances in this test set
+  rules:
+    - DRL  # The rule used to test
+  sample: true  # Turn on the DRL-S mode
+  num_sample: 25  # Number of copied instances to sample for DRL-S
+  num_average: 2  # Number of loops in DRL-G to calculate the mean
+  public_ins: true  # Instances from well-known benchmarks or not
+  data_path: "2025"  # Relative path of this test set
+  record_sol: true
+
+nn_paras:
+  pooling_method: mean # Method to pool the node features ['mean', 'sum', 'max'] and ['attention']
+  priority_coef : 0
+  wait_flag: true  # Whether to use the wait
+  wait_deal: softmax  # How to deal with the wait
+  qkv: false
+  emb_qkv: false
+  graph_embedding:
+    model: GAT # in ['HGT', 'GAT', 'HAN']
+    opes_dim: 5
+    mas_dim: 6
+    combs_dim: 2
+    jobs_dim: 1
+    proc_dim: 1
+    num_heads: [2, 2, 2]  # Number of heads in GAT
+    hidden_dim: 64  # Hidden dimensions of the MLPs
+    dropout: 0  # dropout ratio
+    jk: max
+
+  actor:
+    hidden_dims: [64, 32]  # Hidden dimensions of the actor
+  critic:
+    hidden_dims: [64, 32]  # Hidden dimensions of the critic
+
