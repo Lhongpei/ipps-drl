@@ -40,7 +40,7 @@ if __name__ == '__main__':
     setup_seed(42)
     
     if torch.cuda.is_available():
-        device = "cuda:3"
+        device = "cuda:0"
         torch.cuda.set_device(device)
         torch.set_default_device(device)
     else:
