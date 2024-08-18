@@ -7,7 +7,6 @@ import sys
 from utils.utils import pad_1d_tensors, pad_2d_tensors, pad_to_given_size, pad_to_middle_given_size, pad_stack_add_idxes, getAncestors, sort_schedule
 from tqdm import tqdm
 from network.hetero_data import Graph_Batch
-from env.case_generator_ipps import CaseGenerator
 
 @dataclass
 class EnvState:
@@ -197,7 +196,7 @@ class IPPSEnv:
         self.time = torch.zeros(self.batch_size)  # Current time of the environment
         # shape: (batch_size, num_jobs), the id of the current operation (be waiting to be processed) of each job
         self.ope_step_batch = copy.deepcopy(self.num_ope_biases_batch)
-        # shape: (batch_size, num_opes) Whether the operation is eligible
+        # shape: (batch_size, num_opes), whether the operation is eligible
         self.next_ope_eligible_batch = pad_1d_tensors(tensors[9], value=0).long()
         # shape: (batch_size, num_opes), the number of required operations for each operation
         self.ope_req_num_batch = pad_1d_tensors(tensors[8], value=100).long()
@@ -205,36 +204,23 @@ class IPPSEnv:
         self.job_end_time_batch = torch.zeros(size=(self.batch_size, self.num_jobs))
         # shape: (batch_size, num_opes), the ready time of each operation
         self.ready_time = torch.zeros_like(self.ope_req_num_batch)
-        # shape: (batch_size, num_combs) 
+        # shape: (batch_size, num_combs)
         self.combs_time_batch = torch.zeros(size=(self.batch_size, self.combs_batch.size(1)))
         self.job_estimate_end_batch = torch.zeros(size=(self.batch_size, self.num_jobs))
        
-        '''
-        features, dynamic
-            ope:
-                Status
-                Number of neighboring machines
-                Processing time
-                Number of unscheduled operations in the job
-                Job completion time
-                Start time
-            ma:
-                Number of neighboring operations
-                Available time
-                Utilization
-        '''
-        # operation infoures        size = (self.batch_size, self.num_opes)
-        # info_opes_batch[:, 0, :]
+
+        # operation features        
+        # shape: (self.batch_size, self.num_opes), whether the operation is scheduled
         self.info_ope_status_batch = torch.zeros(size = (self.batch_size, self.num_opes)).scatter(1, self.num_ope_biases_batch, 1)
-        # info_opes_batch[:, 2, :]
+        # shape: (self.batch_size, self.num_opes), estimated processing time of operations
         self.info_ope_proc_time_batch = torch.sum(self.proc_times_batch, dim=2).div(torch.count_nonzero(self.ope_ma_adj_batch, dim=2).float() + 1e-9) \
             if self.reward_info['ma_mean'] else torch.min(torch.where(self.ope_ma_adj_batch == 1, self.proc_times_batch, torch.inf), dim = 2)[0]
         self.info_ope_proc_time_batch = torch.where(self.info_ope_proc_time_batch == torch.inf, 0, self.info_ope_proc_time_batch)
-
+        # shape: (self.batch_size), average processing time of each batch
         self.ave_proc_time = torch.sum(self.info_ope_proc_time_batch).div(torch.count_nonzero(self.info_ope_proc_time_batch).float() + 1e-9)
-
+        # shape: (self.batch_size, self.num_opes), real start time of operations
         self.info_ope_scheduled_start_batch = torch.zeros(size = (self.batch_size, self.num_opes))
-        # info_ope_status_batch, info_ope_proc_time_batch, info_ope_scheduled_start_batch
+
 
         # Masks of current status, dynamic
         # shape: (batch_size, num_jobs), True for jobs in process
@@ -261,6 +247,7 @@ class IPPSEnv:
         self.machines_batch = torch.zeros(size=(self.batch_size, self.num_mas, 4))
         self.machines_batch[:, :, 0] = torch.ones(size=(self.batch_size, self.num_mas))
         
+        # initialize the estiamted combs, jobs end time and makespan
         self.makespan_batch = self.get_estimate_end_time(self.mask_job_finish_batch)
         self.done_batch = self.mask_job_finish_batch.all(dim=1)  # shape: (batch_size)
 
@@ -398,9 +385,8 @@ class IPPSEnv:
         self.ope_ma_adj_batch[active_idxes, opes] = remain_ope_ma_adj[active_idxes, :]
         self.proc_times_batch *= self.ope_ma_adj_batch
 
-        # Update for some O-M arcs are removed, such as 'Status', 'Number of neighboring machines' and 'Processing time'
-        
 
+        # Update for some O-M arcs are removed, such as 'Status', 'Number of neighboring machines' and 'Processing time'
         self.info_ope_status_batch[active_idxes, opes] = torch.ones(active_idxes.size(0), dtype=torch.float)
         self.info_ope_proc_time_batch[active_idxes, opes] = proc_times
 
@@ -436,9 +422,6 @@ class IPPSEnv:
         # get reward
         bonus = torch.zeros(len(active_idxes))
         if self.reward_info['balance_bonus']:
-            # active_ave_job_end_batch = torch.sum(self.job_estimate_end_batch[active_idxes] * ~lag_mask_job_finish_batch[active_idxes], dim=1) / torch.sum(~lag_mask_job_finish_batch[active_idxes], dim=1)
-            # bonus = (torch.sigmoid(2 * (self.job_estimate_end_batch[active_idxes, jobs] - active_ave_job_end_batch) /
-            #                                          (active_ave_job_end_batch * 1.25 - self.time[active_idxes]) * proc_times.bool()) - 0.5) * 2
             bonus = torch.where(self.job_estimate_end_batch[active_idxes, jobs] >= 0.8 * torch.max(self.job_estimate_end_batch[active_idxes] * ~lag_mask_job_finish_batch[active_idxes], dim=1)[0],
                                 self.ave_proc_time / 10, - self.ave_proc_time / (10 * self.num_jobs)) * proc_times.bool()
         
@@ -452,7 +435,6 @@ class IPPSEnv:
 
         self.makespan_batch = max_makespan
 
-        # print(f"Reward: {self.reward_batch}")
         if self.N % self.change_interval == 0:
                 self.proc_time_change(lag_mask_job_finish_batch, actions, ratio_range = 0.25)
         
@@ -742,7 +724,6 @@ class IPPSEnv:
         
         elif data_source=='tensor':  # Load instances from tensors
             tensor_loaded = case['tensor']
-            infos = case['info']
 
         
         else:  # Load instances from files
@@ -786,41 +767,41 @@ class IPPSEnv:
         old_valid_mas_num = torch.zeros_like(self.valid_mas_num)        
         add_batch_idxes = torch.tensor(add_batch_idxes, dtype=torch.long)
         self.combs_id_batch = pad_stack_add_idxes(self.combs_id_batch, tensors[10], (self.valid_jobs_num, self.valid_combs_num), (new_valid_jobs_num, new_valid_combs_num), add_batch_idxes, value=0, dim=2)
-        # # shape: (batch_size, num_opes, num_mas)
+        # shape: (batch_size, num_opes, num_mas)
         self.proc_times_batch = pad_stack_add_idxes(self.proc_times_batch, tensors[0], (self.valid_opes_num, old_valid_mas_num), (new_valid_opes_num, new_valid_mas_num), add_batch_idxes, value=0, dim=2).float()
-        # # shape: (batch_size, num_opes, num_mas)
+        # shape: (batch_size, num_opes, num_mas)
         self.ope_ma_adj_batch = pad_stack_add_idxes(self.ope_ma_adj_batch, tensors[1], (self.valid_opes_num, old_valid_mas_num), (new_valid_opes_num, new_valid_mas_num), add_batch_idxes, value=0, dim=2).long()
-        # # shape: (batch_size, num_opes)
+        # shape: (batch_size, num_opes)
         self.remain_opes_batch = pad_stack_add_idxes(self.remain_opes_batch, tensors[12], self.valid_opes_num, new_valid_opes_num, add_batch_idxes, value=0, dim=1).long()
-        # # static feats
-        # # shape: (batch_size, num_opes, num_opes)
+        # static feats
+        # shape: (batch_size, num_opes, num_opes)
         self.ope_pre_adj_batch = pad_stack_add_idxes(self.ope_pre_adj_batch, tensors[2], (self.valid_opes_num, self.valid_opes_num), (new_valid_opes_num, new_valid_opes_num), add_batch_idxes, value=0, dim=2).long()
-        # # shape: (batch_size, num_opes), represents the mapping between operations and jobs
+        # shape: (batch_size, num_opes), represents the mapping between operations and jobs
         self.opes_appertain_batch = pad_stack_add_idxes(self.opes_appertain_batch, [ts + torch.max(self.opes_appertain_batch, dim = 1)[0][add_batch_idxes[i]] + 1 for i, ts in enumerate(tensors[3])],
                                                         self.valid_opes_num, new_valid_opes_num, add_batch_idxes, value=0, dim=1).long()
-        # # shape: (batch_size, num_jobs), the id of the first operation of each job
+        # shape: (batch_size, num_jobs), the id of the first operation of each job
         self.num_ope_biases_batch = pad_stack_add_idxes(self.num_ope_biases_batch, [ts + torch.sum(self.nums_ope_batch[add_batch_idxes[i]]) for i, ts in enumerate(tensors[4])],
                                                         self.valid_jobs_num, new_valid_jobs_num, add_batch_idxes, value=0, dim=1).long()
-        # # shape: (batch_size, num_jobs), the number of operations for each job
+        # shape: (batch_size, num_jobs), the number of operations for each job
         self.nums_ope_batch = pad_stack_add_idxes(self.nums_ope_batch, tensors[5], self.valid_jobs_num, new_valid_jobs_num, add_batch_idxes, value=0, dim=1).long()
-        # # shape: (batch_size, num_jobs), the id of the last operation of each job
+        # shape: (batch_size, num_jobs), the id of the last operation of each job
         self.end_ope_biases_batch = self.num_ope_biases_batch + self.nums_ope_batch - 1
-        # # shape: (batch_size, num_opes, num_opes), whether exist OR between operations
+        # shape: (batch_size, num_opes, num_opes), whether exist OR between operations
         self.ope_or_batch = pad_stack_add_idxes(self.ope_or_batch, tensors[7], (self.valid_opes_num, self.valid_opes_num), (new_valid_opes_num, new_valid_opes_num), add_batch_idxes, value=0, dim=2).long()
-        # # shape: (batch_size, num_combs, num_opes)
+        # shape: (batch_size, num_combs, num_opes)
         self.combs_batch = pad_stack_add_idxes(self.combs_batch, tensors[11], (self.valid_combs_num, self.valid_opes_num), (new_valid_combs_num, new_valid_opes_num), add_batch_idxes, value=0, dim=2).float()
 
         self.ope_step_batch = pad_stack_add_idxes(self.ope_step_batch, [ts + torch.sum(self.nums_ope_batch[add_batch_idxes[i], :-1]) for i, ts in enumerate(tensors[4])],
                                                   self.valid_jobs_num, new_valid_jobs_num, add_batch_idxes, value=-1, dim=1).long()
-        # # shape: (batch_size, num_opes) Whether the operation is eligible
+        # shape: (batch_size, num_opes) Whether the operation is eligible
         self.next_ope_eligible_batch = pad_stack_add_idxes(self.next_ope_eligible_batch, tensors[9], self.valid_opes_num, new_valid_opes_num, add_batch_idxes, value=0, dim=1).long()
         # # shape: (batch_size, num_opes), the number of required operations for each operation
         self.ope_req_num_batch = pad_stack_add_idxes(self.ope_req_num_batch, tensors[8], self.valid_opes_num, new_valid_opes_num, add_batch_idxes, value=100, dim=1).long()
-        # # shape: (batch_size, num_jobs), the completion time of each job
+        # shape: (batch_size, num_jobs), the completion time of each job
         self.job_end_time_batch = pad_to_given_size(self.job_end_time_batch, self.nums_ope_batch.size(1), value = 0, num_dims=1)
-        # # shape: (batch_size, num_opes), the ready time of each operation
+        # shape: (batch_size, num_opes), the ready time of each operation
         self.ready_time = pad_to_given_size(self.ready_time, self.remain_opes_batch.size(1), value = 0, num_dims=1)
-        # # shape: (batch_size, num_combs) 
+        # shape: (batch_size, num_combs) 
         self.combs_time_batch = pad_to_given_size(self.combs_time_batch, self.combs_batch.size(1), value = 0, num_dims=1)
        
         self.info_ope_status_batch = pad_to_given_size(self.info_ope_status_batch, self.num_opes, value = 0, num_dims=1).scatter(1, self.num_ope_biases_batch, 1)
@@ -942,7 +923,3 @@ class IPPSEnv:
         matrix_cal_cumul = getAncestors(self.ope_pre_adj_batch[idx])
         schedule = sort_schedule(schedule, matrix_cal_cumul)
         return schedule
-        
-
-    def close(self):
-        pass
