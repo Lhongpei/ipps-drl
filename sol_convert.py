@@ -83,44 +83,6 @@ def drl_to_ws(data_path, problem):
             line = f"complete_times({key_str})\t\t\t{value}\n"
             file.write(line)
 
-def order_correct(origin_sol_folder, pro_folder, to_sol_folder):
-    if not os.path.exists(to_sol_folder):
-        os.makedirs(to_sol_folder)
-    for sol_file in os.listdir(origin_sol_folder):
-        if not sol_file.endswith("optimal.txt"):
-            continue
-        prefix = sol_file[:-4]
-        pro_file = prefix[8:-8] if prefix.endswith("_optimal") else prefix[8:]
-        pro_path = os.path.join(pro_folder, pro_file)
-        if not os.path.exists(pro_path):
-            raise Warning("No problem file.")
-        origin_sol_path = os.path.join(origin_sol_folder, sol_file)
-        to_sol_path = os.path.join(to_sol_folder, sol_file)
-
-        with open(pro_path, 'r') as file:
-            pro_lines = file.read().splitlines()
-        tensor = load_ipps(pro_lines)
-
-        with open(origin_sol_path, 'r') as file:
-            original_sol_lines = file.read().splitlines()
-
-        to_sol_lines = []
-        for i, line in enumerate(original_sol_lines):
-            if i == 0:
-                to_sol_lines.append(list(map(int, line.split())))
-            else:
-                line = list(map(int, line.split()))
-                # job, ope, ma, start  ->  ope, ma, job, start, end
-                new_line = [line[1], line[2], line[0], line[3]]
-                new_line.append(line[3] + int(tensor[0][line[1], line[2]]))
-                to_sol_lines.append(new_line)
-        matrix_cal_cumul = getAncestors(tensor[2])
-        to_sol_lines[1:] = sort_schedule(to_sol_lines[1:], matrix_cal_cumul)
-
-        with open(to_sol_path, 'w') as file:
-            for row in to_sol_lines:
-                file.write(' '.join(map(str, row)) + '\n')
-
 def sort_sols(origin_sol_folder, pro_folder, to_sol_folder):
     if not os.path.exists(to_sol_folder):
         os.makedirs(to_sol_folder)
