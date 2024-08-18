@@ -226,7 +226,7 @@ def main():
             'ave_time': [tensor.item() for tensor in times]
         })
 
-        data.to_csv(f'{save_path}/result_{str_time}_{rule.split('.')[0]}.csv', index=False)
+        data.to_csv(f'{save_path}/result_{str_time}_{rule.split(".")[0]}.csv', index=False)
         # np._save('{0}/sols_{1}.npy'.format(save_path, str_time), sols)
 
         for env in envs:

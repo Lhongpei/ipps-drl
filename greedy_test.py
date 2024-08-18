@@ -35,7 +35,7 @@ def main():
     pynvml.nvmlInit()
     handle = pynvml.nvmlDeviceGetHandleByIndex(0)
     if torch.cuda.is_available():
-        device = "cuda:1"
+        device = "cuda:0"
         torch.cuda.set_device(device)
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
     else:

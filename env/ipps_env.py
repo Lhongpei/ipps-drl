@@ -1,7 +1,6 @@
 import torch
 from dataclasses import dataclass
 from env.load_data import load_ipps, nums_detec
-from env.load_fjsp import load_fjsp, nums_detec_fjsp
 import numpy as np
 import copy
 import sys
