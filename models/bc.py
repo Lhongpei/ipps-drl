@@ -1,11 +1,9 @@
 import torch
 import torch.nn as nn
-import copy
 import math
 import itertools
 from network.hetero_data import Graph_Batch
-from models.expert import Expert, ExpertPolicy
-from utils.utils import solutions_padding
+from models.expert import Expert
 from models.memory import MemoryIL
 from tqdm import tqdm
 class BehaviorCloning:

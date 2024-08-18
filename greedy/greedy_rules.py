@@ -1,6 +1,5 @@
 import torch
 from env.ipps_env import EnvState
-from torch_scatter import scatter
 import random
     # """
     #     Notice that ALL PDR METHOD SHOULD SET BATCH_SIZE = 1

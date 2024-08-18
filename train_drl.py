@@ -11,7 +11,7 @@ import wandb
 from models.memory import MemoryRL
 from models.ppo import PPO
 from omegaconf import OmegaConf
-from env.case_generator_ipps import CaseGenerator
+from generator.case_generator_ipps import CaseGenerator
 from validate import validate, get_validate_env
 
 import tqdm
@@ -33,13 +33,13 @@ def setup_seed(seed):
 
 def main():
 
-    use_wandb = True
+    use_wandb = False
     init_wandb(use_wandb)
     setup_seed(0)
     # PyTorch initialization
 
     if torch.cuda.is_available():
-        device = "cuda:1"
+        device = "cuda:0"
         torch.cuda.set_device(device)
         torch.set_default_device(device)
     else:

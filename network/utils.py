@@ -2,9 +2,7 @@ import torch
 from torch import nn
 from torch_geometric.data import HeteroData
 from torch_scatter import scatter
-from torch_geometric.transforms import RemoveIsolatedNodes
 from torch_geometric.nn import GraphNorm
-import copy
 def get_indices(hetero_data:HeteroData, batch_idx:torch.Tensor, local_indices:torch.Tensor):
     """Caculate the indices in Batch Graph according to the batch index and local indices.
 

@@ -1,15 +1,12 @@
 from torch_geometric.data import HeteroData, Batch
 from network.utils import get_remain_edges_per_node_type
-from itertools import product
 import torch
 import sys
 sys.path.append('..')
 sys.path.append('.')
 sys.path.append('...')
-from env.load_data import load_ipps
 import torch
 from utils.utils import flatten_padded_tensor   
-from torch_scatter import scatter_max
 from torch_scatter import scatter
 import copy
 class Graph_Batch:

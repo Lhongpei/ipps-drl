@@ -1,7 +1,5 @@
 import torch
-from collections import deque
 from utils.utils import getAncestors, parse_data, getAdjacent
-from torch.nn.utils.rnn import pad_sequence
 from get_possible_set import comb_matrix_core,find_or_dict
 #假设数据从一个名为"graph_data.txt"的文件中读取
 file_path = 'kim_dataset/problem/problem1.txt'
