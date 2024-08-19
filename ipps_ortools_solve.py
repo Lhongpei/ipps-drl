@@ -192,9 +192,8 @@ if __name__ == '__main__':
     # File paths and directories
     file_folder = "65_pro/"
     save_folder = "65_sol/"
-    ws_folder = "IL_test/0205/ws_solution/"
+    ws_folder = None
     log_folder = "solver_log"
-    is_ws = False
     log = True
     only_comb = True
     if not os.path.exists(save_folder):
@@ -215,7 +214,7 @@ if __name__ == '__main__':
 
         file_path = os.path.join(file_folder, file)
         save_path = os.path.join(save_folder, "o2d_sol_" + file)
-        ws_path = os.path.join(ws_folder, "ws_sol_" + file) if is_ws else ''
+        ws_path = os.path.join(ws_folder, "ws_sol_" + file) if ws_folder is not None else ''
 
         # check if the solution file already exists, if so, skip this file.
         split_path = save_path.split('.')
