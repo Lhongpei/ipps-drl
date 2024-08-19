@@ -56,9 +56,9 @@ The environment and other utils for data are implemented under `./env/` includin
 
 Our problem generation contains 2 parts:
 
-- Job Generation: We implement it in `./problem_generate/Jobs_Generator.py`, which first generates a Direct acyclic graph, and then generates processing time randomly. We use [DAG_Gnerator](https://github.com/Livioni/DAG_Generator), an open-source package that supports randomly generating DAGs, in Jobs_Generator
+- Job Generation: We implement it in `./generator/Jobs_Generator.py`, which first generates a Direct acyclic graph, and then generates processing time randomly. We use [DAG_Gnerator](https://github.com/Livioni/DAG_Generator), an open-source package that supports randomly generating DAGs, in Jobs_Generator
   
-- Problem Generation: It can be found in both `./problem_generate/case_generator_ipps.py` and `./env/case_generator_ipps.py`, which concats several job files into a problem files.
+- Problem Generation: It can be found in both `./generator/case_generator_ipps.py, which converts several job files into problem files.
 
 ### Greedy Dispatching rules
 

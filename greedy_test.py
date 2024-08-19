@@ -21,7 +21,7 @@ from collections import defaultdict
 sys.path.append('.')
 sys.path.append('..')
 
-from draw_gantt import draw_sol_gantt
+from utils.draw_gantt import draw_sol_gantt
 
 def setup_seed(seed):
     torch.manual_seed(seed)
