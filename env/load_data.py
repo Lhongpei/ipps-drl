@@ -1,6 +1,6 @@
 import torch
 from utils.utils import getAncestors, parse_data, getAdjacent
-from get_possible_set import comb_matrix_core,find_or_dict
+from utils.get_possible_set import comb_matrix_core,find_or_dict
 #假设数据从一个名为"graph_data.txt"的文件中读取
 file_path = 'kim_dataset/problem/problem1.txt'
 
