@@ -190,17 +190,32 @@ def ortools_warm_start(model, makespan, combination, assignment, complete_times,
     return
 
 if __name__ == '__main__':
-    # File paths and directories
-    file_folder = "65_pro/"
-    save_folder = "65_sol/"
-    ws_folder = None
-    log_folder = "solver_log"
-    log = True
-    only_comb = True
-    M = int(9e6)
-    init_ub = int(1e4)
-    time_limit = 3600
-    workers = 32
+    parser = argparse.ArgumentParser(description='Process some integers.')
+
+    parser.add_argument('--file_folder', default='data_test/0405/problem', help='File folder path')
+    parser.add_argument('--save_folder', default='data_test/0405/solution', help='Save folder path')
+    parser.add_argument('--ws_folder', default=None, help='Warm Start folder path, default None that means no warm start')
+    parser.add_argument('--log_folder', default='solver_log', help='Log folder path')
+    parser.add_argument('--log', type=bool, default=True, help='Use log?')
+    parser.add_argument('--only_comb', type=bool, default=True, help='Only warm start combination?')
+    parser.add_argument('--big_M', type=int, default=int(9e6), help='Big M value')
+    parser.add_argument('--init_ub', type=int, default=int(1e4), help='Initial UB')
+    parser.add_argument('--time_limit', type=int, default=3600, help='Time limit')
+    parser.add_argument('--workers', type=int, default=32, help='Number of workers')
+
+    args = parser.parse_args()
+
+    file_folder = args.file_folder
+    save_folder = args.save_folder
+    ws_folder = args.ws_folder
+    log_folder = args.log_folder
+    log = args.log
+    only_comb = args.only_comb
+    big_M = args.big_M
+    init_ub = args.init_ub
+    time_limit = args.time_limit
+    workers = args.workers
+    
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
 
@@ -257,7 +272,7 @@ if __name__ == '__main__':
         solve_time, makespan = solve_ipps_with_ortools(id_job, id_machine, id_operation, id_set_operation, id_combination,
                                 process_time, machine_oper, ope_ma_adj, matrix_pre_proc, matrix_cal_cumul,
                                 save_path=save_path, drl_sol=ws_path# if os.path.exists(ws_path) else None
-                                , only_comb = only_comb)
+                                , only_comb = only_comb, M = big_M, init_ub = init_ub, time_limit = time_limit, workers = workers)
         times.append(solve_time)
         makespans.append(makespan)
     if log:
