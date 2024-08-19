@@ -22,8 +22,6 @@ def draw_gantt(actions, num_jobs, num_machines, matrix_proc_time, folder='./', s
     - operation_times (dict): A dictionary containing the start and end times for each operation.
 
     """
-    # Rest of the code...
-def draw_gantt(actions, num_jobs, num_machines, matrix_proc_time, folder='./', suffix = ''):
 
     if not os.path.exists(folder):
         os.makedirs(folder)

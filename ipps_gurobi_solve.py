@@ -2,7 +2,7 @@ import gurobipy as gp
 from gurobipy import GRB
 import os
 from env.load_data import load_ipps
-from get_possible_set import read_ipps_data, get_comb_info
+from utils.get_possible_set import read_ipps_data, get_comb_info
 
 def solve_ipps_with_gurobi(id_job, id_machine, id_operation, id_set_operation, id_combination, process_time, machine_oper, ope_ma_adj, matrix_pre_proc, matrix_cal_cumul, drl_sol=None,save_path=None,only_comb=False):
     # create a new model
@@ -84,10 +84,10 @@ def solve_ipps_with_gurobi(id_job, id_machine, id_operation, id_set_operation, i
         model.setParam("MIPStart", drl_sol)
     model.setParam(GRB.Param.Threads, 64)
     print('Solving model')
-    # 求解模型
+
     model.optimize()
 
-    # 打印解的状态
+
     status = model.status
     if status == GRB.OPTIMAL:
         model.write("sol.sol")

@@ -6,7 +6,7 @@ import time
 import os
 import copy
 from tqdm import tqdm
-from draw_gantt import draw_sol_gantt
+from utils.draw_gantt import draw_sol_gantt
 def get_validate_env(env_paras, valid_data_files = None):
     '''
     Generate and return the validation environment from the validation set ()

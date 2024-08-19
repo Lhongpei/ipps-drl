@@ -1,7 +1,7 @@
 import numpy as np
 import os
 
-from get_possible_set import get_comb_info
+from utils.get_possible_set import get_comb_info
 from env.load_data import nums_detec, load_ipps
 from utils.utils import sort_schedule, getAncestors
 
