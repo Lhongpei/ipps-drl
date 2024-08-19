@@ -1,15 +1,10 @@
-from collections import deque
 import networkx as nx
 import matplotlib.pyplot as plt
 from itertools import product
 import numpy as np
-from collections import defaultdict
-import os
 import torch
 from utils.utils import getAncestors, parse_data, getAdjacent, nums_detec
 from itertools import product
-from tqdm import tqdm
-import copy
 
 
 def read_ipps_data(file_path, matrix_proc_time, matrix_ope_ma_adj,  id_operation):

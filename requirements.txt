@@ -1,0 +1,14 @@
+# Requirements
+
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.4.2
+torch==2.4.0
+torchvision==0.19.0
+wandb==0.17.5
+omegaconf==2.3.0
+openpyxl==3.1.2
+tqdm==4.66.4
+pynvml==11.5.3
+matplotlib==3.8.4
+ortools==9.10.4067

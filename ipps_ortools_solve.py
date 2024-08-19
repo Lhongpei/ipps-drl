@@ -1,7 +1,6 @@
 from ortools.sat.python import cp_model
 from env.load_data import load_ipps
 from utils.get_possible_set import read_ipps_data, get_comb_info
-import numpy as np
 import os
 import pandas as pd
 import time

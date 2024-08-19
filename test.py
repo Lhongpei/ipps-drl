@@ -13,7 +13,7 @@ from models.memory import MemoryRL
 from models.ppo import PPO
 from env.load_data import nums_detec
 from utils.trick import shrink_schedule
-from sol_convert import sort_sol
+from utils.sol_convert import sort_sol
 
 import sys
 sys.path.append('.')
