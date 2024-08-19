@@ -1,18 +1,19 @@
 from ortools.sat.python import cp_model
 from env.load_data import load_ipps
-from get_possible_set import read_ipps_data, get_comb_info
+from utils.get_possible_set import read_ipps_data, get_comb_info
 import numpy as np
 import os
 import pandas as pd
 import time
 import re
-
-def solve_ipps_with_ortools(id_job, id_machine, id_operation, id_set_operation, id_combination, process_time, machine_oper, ope_ma_adj, matrix_pre_proc, matrix_cal_cumul, drl_sol=None, save_path=None, only_comb = False):
+import argparse
+def solve_ipps_with_ortools(id_job, id_machine, id_operation, id_set_operation, id_combination, process_time, machine_oper, ope_ma_adj, matrix_pre_proc, matrix_cal_cumul, drl_sol=None, 
+                            save_path=None, only_comb = False, M = int(9e6), init_ub = int(1e4), time_limit = 3600, workers = 32):
     # Create model
     model = cp_model.CpModel()
 
     # Variable 1: Makespan
-    makespan = model.NewIntVar(0, 100000, 'makespan')
+    makespan = model.NewIntVar(0, init_ub, 'makespan')
 
     # Variable 2: Job combination selection (Y)
     combination = {}
@@ -41,7 +42,7 @@ def solve_ipps_with_ortools(id_job, id_machine, id_operation, id_set_operation, 
     for i in id_job:
         for h in id_combination[i]:
             for j in id_set_operation[i][h]:
-                complete_times[(i, h, j)] = model.NewIntVar(0, 100000, f'complete_times_{i}_{h}_{j}')
+                complete_times[(i, h, j)] = model.NewIntVar(0, init_ub, f'complete_times_{i}_{h}_{j}')
 
     # Auxiliary variable: Order on machine
     order_on_machine = {}
@@ -66,7 +67,7 @@ def solve_ipps_with_ortools(id_job, id_machine, id_operation, id_set_operation, 
     for i in id_job:
         for h in id_combination[i]:
             for j in id_set_operation[i][h]:
-                model.Add(combination[i, h] * 30000 >= complete_times[i, h, j])
+                model.Add(combination[i, h] * M >= complete_times[i, h, j])
 
     # Constraint 4: Precedence constraints
     for i in id_job:
@@ -89,7 +90,7 @@ def solve_ipps_with_ortools(id_job, id_machine, id_operation, id_set_operation, 
             for j1 in id_set_operation[i][h]:
                 for j2 in id_set_operation[i][h]:
                     if j1 != j2:
-                        model.Add(complete_times[i, h, j2] >= complete_times[i, h, j1] + sum(assignment[i, h, j2, k] * process_time[(i, j2, k)] for k in machine_oper[(i, j2)]) - 30000 * (1 - sequence[i, j1, j2]))
+                        model.Add(complete_times[i, h, j2] >= complete_times[i, h, j1] + sum(assignment[i, h, j2, k] * process_time[(i, j2, k)] for k in machine_oper[(i, j2)]) - M * (1 - sequence[i, j1, j2]))
 
     # Constraint 7 & 8: Machine order
     for i1 in id_job:
@@ -101,8 +102,8 @@ def solve_ipps_with_ortools(id_job, id_machine, id_operation, id_set_operation, 
                             for k1 in machine_oper[(i1, j1)]:
                                 for k2 in machine_oper[(i2, j2)]:
                                     if i1 != i2 and k1 == k2:
-                                        model.Add(complete_times[i2, h2, j2] >= complete_times[i1, h1, j1] + assignment[i2, h2, j2, k2] * process_time[(i2, j2, k2)] - 30000 * (1 - order_on_machine[(i1, j1, i2, j2)]) - 30000 * (2 - assignment[i1, h1, j1, k1] - assignment[i2, h2, j2, k2]))
-                                        model.Add(complete_times[i1, h1, j1] >= complete_times[i2, h2, j2] + assignment[i1, h1, j1, k1] * process_time[(i1, j1, k1)] - 30000 * order_on_machine[(i1, j1, i2, j2)] - 30000 * (2 - assignment[i1, h1, j1, k1] - assignment[i2, h2, j2, k2]))
+                                        model.Add(complete_times[i2, h2, j2] >= complete_times[i1, h1, j1] + assignment[i2, h2, j2, k2] * process_time[(i2, j2, k2)] - M * (1 - order_on_machine[(i1, j1, i2, j2)]) - M * (2 - assignment[i1, h1, j1, k1] - assignment[i2, h2, j2, k2]))
+                                        model.Add(complete_times[i1, h1, j1] >= complete_times[i2, h2, j2] + assignment[i1, h1, j1, k1] * process_time[(i1, j1, k1)] - M * order_on_machine[(i1, j1, i2, j2)] - M * (2 - assignment[i1, h1, j1, k1] - assignment[i2, h2, j2, k2]))
 
     # Constraint 9: Define makespan
     for i in id_job:
@@ -121,8 +122,8 @@ def solve_ipps_with_ortools(id_job, id_machine, id_operation, id_set_operation, 
     print("Solving the model...")
     solver = cp_model.CpSolver()
     solver.parameters.log_search_progress = True  
-    solver.parameters.max_time_in_seconds = 1800
-    solver.parameters.num_search_workers = 32
+    solver.parameters.max_time_in_seconds = time_limit
+    solver.parameters.num_search_workers = workers
     status = solver.Solve(model)
     solve_time = solver.WallTime()
 
@@ -196,6 +197,10 @@ if __name__ == '__main__':
     log_folder = "solver_log"
     log = True
     only_comb = True
+    M = int(9e6)
+    init_ub = int(1e4)
+    time_limit = 3600
+    workers = 32
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
 
