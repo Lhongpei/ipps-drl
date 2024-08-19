@@ -61,7 +61,7 @@ def main():
     test_files = os.listdir(data_path)
     test_files.sort(key=lambda x: x[:-4])
     test_files = test_files[:num_ins]
-    mod_files = os.listdir('./model/')[:]
+
 
     envs = []  # Store multiple environments
 

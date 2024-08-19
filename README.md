@@ -10,7 +10,7 @@ Under `./models`, we implement the PPO algorithm, Behavior Cloning algorithm and
 
 `./models/policy.py` implements policy classes:
 
-- `Policy` contains basic methods such as transforming embeddings of O-M pairs from graph to tensor, pooling embeddings and catting embedding and obtain action probabilities.
+- `Policy` contains basic methods such as transforming embeddings of O-M pairs from graph to tensor, pooling embeddings and catting embedding and obtaining action probabilities.
   
 - `DRLPolicy` and `ExpertPolicy` inherit class `Policy`, which implements methods used in DRL and IL respectively.
 
@@ -64,21 +64,23 @@ Our problem generation contains 2 parts:
 
 greedy dispatching rules are implemented in `./greedy/greedy_rules`.
 
-Use the following command to run greedy solving test problems:
-
-```python
-python greedy_test.py
-```
-
 ### MILP Models
 
 Our MILP model is implemented based on [OR-Tools](https://github.com/google/or-tools), an open-source solver.
 
-Use the following command to run MILP solver:
+Run the `ipps_ortools_solve.py` script with specified parameters:
 
-```python
-python ipps_solve_ortools.py
+```bash
+python ipps_ortools_solve.py \  # Run the ipps_ortools_solve.py script
+  --file_folder=<file_folder> \  # Specify the file folder path
+  --save_folder=<save_folder> \  # Specify the save folder path
+  --time_limit=<time_limit> \  # Specify the time limit
+  --workers=<workers>  # Specify the number of worker threads
 ```
+
+## Training Phase
+
+`./train_bc` and `./train_drl` are scripts to use Behavior Cloning and PPO to train models, respectively.
 
 ## Reference
 

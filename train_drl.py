@@ -17,12 +17,7 @@ from validate import validate, get_validate_env
 import tqdm
 def init_wandb(use_wandb):
     if use_wandb:
-        wandb.init(
-            group='DRL',
-            name = '0503 naive 0.99',
-            project="PyG implementation",
-            entity="ipps-learning"
-        )
+        wandb.init()
 
 def setup_seed(seed):
     torch.manual_seed(seed)

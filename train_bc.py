@@ -16,14 +16,7 @@ import wandb
 import time
 def init_wandb(use_wandb):
     if use_wandb:
-        wandb.init(
-            group='IL',
-            name = '0505 bc all qkv',
-            # set the wandb project where this run will be logged
-            project="PyG implementation",
-            entity="ipps-learning"
-            # track hyperparameters and run metadata
-        )
+        wandb.init()
 
 def setup_seed(seed):
     torch.manual_seed(seed)
@@ -35,7 +28,6 @@ def setup_seed(seed):
 if __name__ == '__main__':
 
     use_wandb = True
-    epoch = 30000
     init_wandb(use_wandb)
     setup_seed(42)
     
@@ -54,13 +46,14 @@ if __name__ == '__main__':
     env_valid_paras = copy.deepcopy(env_paras)
     env_valid_paras["batch_size"] = env_paras["valid_batch_size"]
     IL_paras = config['IL_paras']
+    epoch = IL_paras["epoch"]
     config_dict = OmegaConf.to_container(config, resolve=True)
     if use_wandb:
         wandb.config.update(config_dict)
     dir_dict = "IL_test/{0}{1}/".format(str.zfill(str(env_paras["num_jobs"]),2),
                                                    str.zfill(str(env_paras["num_mas"]),2))
 
-    dir_dict = "IL_test/0505_all/"
+    dir_dict = "IL_test/0605/"
     scheduler = ILDataScheduler(config, dir_dict, device)
     dataset_loader = scheduler.load_dataset(shuffle=False)
     validate_path = "./data_dev/{0}{1}/".format(str.zfill(str(env_paras["num_jobs"]),2),

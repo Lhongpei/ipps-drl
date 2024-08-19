@@ -39,6 +39,8 @@ train_paras:
 IL_paras:
   save_timestep: 1
   update_timestep: 1
+  K_epochs: 10
+  epoch: 3000
 
 test_paras:
   if_draw_gantt: false  # Draw Gantt chart or not

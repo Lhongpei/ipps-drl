@@ -34,7 +34,7 @@ class BehaviorCloning:
     def __init__(self, config, sols: torch.Tensor = None):
         self.lr = config.train_paras.lr  # learning rate
         self.betas = config.train_paras.betas  # default value for Adam
-        self.K_epochs = config.train_paras.K_epochs  # Update policy for K epochs
+        self.K_epochs = config.IL_paras.K_epochs  # Update policy for K epochs
         self.device = config.nn_paras.device  # PyTorch device
         self.minibatch_size = config.train_paras.minibatch_size
 
