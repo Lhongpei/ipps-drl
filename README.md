@@ -99,7 +99,7 @@ To our best-known, there isn't a file format to store an IPPS problem, because o
 There are 4 parts in our file format:
 
 1. First line: [number of jobs] [number of machines] [number of operations]
-2. Graph Structure: This part starts with a line of `out`, and each later line has 2 elements representing the operation's IDs of the start and end points of an edge, such as `a b c`, which means there are edges a->b and a->c. Notice that if 2 nodes `b c` are linked to an OR-connector, they will be written as `(b,c)`
+2. Graph Structure: This part starts with a line of `out`, and each later line has at least 2 elements representing the operation's IDs of the start and end points of an edge, such as `a b c`, which means there are edges a->b and a->c. Notice that if 2 nodes `b c` are linked to an OR-connector, they will be written as `(b,c)`
 3. Join: This part is used to store the join nodes and starts with a line of `in`. In each line, `a (b,c)` means that b and c are the last operations in 2 OR braches and join to a.
 4. Processing time: This part starts with a line of `info`. Each later line starts with the machine's IDs. The second element `n` notes how many operations this machine can process, and then fills `2n` elements, where 2i-1 th and 2i th elements note an operation ID and the processing time.
 
