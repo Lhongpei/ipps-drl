@@ -73,18 +73,14 @@ def main():
     model = PPO(model_paras, train_paras)
     model.policy_old.eval()
     model.policy.eval()
-    rules = test_paras["rules"]
     envs = []  # Store multiple environments
-
+    rules = []
     # Detect and add models to "rules"
-    if "DRL" in rules:
-        for root, ds, fs in os.walk('./model/'):
-            for f in fs:
-                if f.endswith('.pt'):
-                    rules.append(f)
-    if len(rules) != 1:
-        if "DRL" in rules:
-            rules.remove("DRL")
+    for _, _, fs in os.walk('./model/'):
+        for f in fs:
+            if f.endswith('.pt'):
+                rules.append(f)
+
 
     # Generate data files and fill in the header
     str_time = time.strftime("%Y%m%d_%H%M%S", time.localtime(time.time()))
