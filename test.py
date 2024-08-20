@@ -67,7 +67,6 @@ def main():
     test_files = test_files[:num_ins]
     mod_files = os.listdir('./model/')
     if_save_sols = test_paras["if_save_sols"]
-    if_draw_gantt = test_paras["if_draw_gantt"]
 
     memories = MemoryRL()
     model = PPO(model_paras, train_paras)
@@ -157,7 +156,7 @@ def main():
                 best_makespan = float('inf')
                 for j in range(test_paras["num_average"]):
                     makespan, time_re, sol = schedule(env, model, memories, flag_sample=test_paras["sample"],
-                                                      save_sols = if_save_sols, draw = if_draw_gantt, shrink = True)
+                                                      save_sols = if_save_sols, shrink = True)
                     makespan_s.append(makespan)
                     if torch.min(makespan) < best_makespan:
                         best_makespan = torch.min(makespan).item()
@@ -176,7 +175,7 @@ def main():
                 best_sol = None
                 best_makespan = float('inf')
                 for j in range(test_paras["num_average"]):
-                    makespan, time_re, sol = schedule(env, model, memories, draw = if_draw_gantt,
+                    makespan, time_re, sol = schedule(env, model, memories,
                                                       save_sols = if_save_sols, shrink = True)
                     makespan_s.append(makespan)
                     if torch.min(makespan) < best_makespan:
@@ -231,7 +230,7 @@ def main():
     print("total_spend_time: ", time.time() - start)
 
 
-def schedule(env:IPPSEnv, model, memories, flag_sample=False, draw = True, save_sols = False, shrink = False):
+def schedule(env:IPPSEnv, model, memories, flag_sample=False, save_sols = False, shrink = False):
     # Get state and completion signal
     state = env.reset()
     dones = env.done_batch

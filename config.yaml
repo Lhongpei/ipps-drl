@@ -43,7 +43,6 @@ IL_paras:
   epoch: 3000
 
 test_paras:
-  if_draw_gantt: false  # Draw Gantt chart or not
   if_save_sols: true  # Save the solution or not
   rules:
     - DRL  # The rule used to test
