@@ -166,7 +166,7 @@ class Expert(torch.nn.Module):
         
         
 if __name__ == "__main__":
-    sols = ["problemsss/ortools_schedule/o2d_sol_problem_job_0_15_611_729.txt", "problemsss/ortools_schedule/o2d_sol_problem_job_1_11_333_352_419_509_698.txt"]
+    sols = ["problemsss/ortools_schedule/o2d_sol_problem_job_0_15_611_729.ipps", "problemsss/ortools_schedule/o2d_sol_problem_job_1_11_333_352_419_509_698.ipps"]
     train_paras = "cpu"
     config = OmegaConf.load("config.yaml")
     expert = Expert(sols, train_paras,config.nn_paras)

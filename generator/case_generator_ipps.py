@@ -94,7 +94,7 @@ class CaseGenerator:
                 new_line.append(line + "\n")
             if save:
                 os.makedirs(new_folder, exist_ok=True)
-                file_name = path+'.txt'
+                file_name = path+'.ipps'
                 with open(os.path.join(new_folder, file_name), 'w') as file: 
                     file.writelines(new_line)
             
@@ -191,7 +191,7 @@ class CaseGenerator:
                 new_line.append(line + "\n")
             if save:
                 os.makedirs(new_folder, exist_ok=True)
-                file_name = f'{self.job_num}_{self.machine_num}_problem_job_{"_".join(map(str, index))}.txt'
+                file_name = f'{self.job_num}_{self.machine_num}_problem_job_{"_".join(map(str, index))}.ipps'
                 with open(os.path.join(new_folder, file_name), 'w') as file: 
                     file.writelines(new_line)
             

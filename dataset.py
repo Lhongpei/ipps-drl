@@ -62,7 +62,7 @@ class ILDataScheduler:
         for sol in list_sols:
             prefix = sol[:-4]
             prefix = prefix[8:-8] if prefix.endswith("_optimal") else prefix[8:]
-            pro = prefix + ".txt"
+            pro = prefix + ".ipps"
             assert pro in list_pros, 'No relative problem.'
             self.data.append((os.path.join(self.dir_pros, pro), os.path.join(self.dir_sols, sol)))
             list_pros.remove(pro)
@@ -270,7 +270,6 @@ def collate_fn(batch):
 
     
 if __name__ == '__main__':
-    from torch.utils.data import DataLoader
     config = None
     dir_dict = 'IL_test/0605/'
     dataset = ILDataScheduler(config, dir_dict, reload = True)
