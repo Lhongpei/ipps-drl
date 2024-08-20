@@ -151,7 +151,7 @@ def solve_ipps_with_ortools(id_job, id_machine, id_operation, id_set_operation, 
         if save_path:
             if status == cp_model.OPTIMAL:
                 split_path = save_path.split('.')
-                save_path = split_path[0] + '_optimal.' + split_path[1]
+                save_path = split_path[0] + '_optimal.' + 'sol'
             schedule = sorted(schedule, key=lambda x: x[3])
             with open(save_path, 'w') as file:
                 file.write(str(solver.Value(makespan)) + '\n')
@@ -163,7 +163,7 @@ def solve_ipps_with_ortools(id_job, id_machine, id_operation, id_set_operation, 
     else:
         print("No feasible solution found.")
         split_path = save_path.split('.')
-        save_path = split_path[0] + '_infeasible.' + split_path[1]
+        save_path = split_path[0] + '_infeasible.' + 'sol'
         with open(save_path, 'w') as file:
             file.write("Infeasible")
         return solve_time, None
@@ -191,7 +191,7 @@ def ortools_warm_start(model, makespan, combination, assignment, complete_times,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process some integers.')
 
-    parser.add_argument('--file_folder', default='data_test/0405/problem', help='File folder path')
+    parser.add_argument('--file_folder', default='example', help='File folder path')
     parser.add_argument('--save_folder', default='data_test/0405/solution', help='Save folder path')
     parser.add_argument('--ws_folder', default=None, help='Warm Start folder path, default None that means no warm start')
     parser.add_argument('--log_folder', default='solver_log', help='Log folder path')
@@ -230,16 +230,17 @@ if __name__ == '__main__':
     for file in files:
         # try:
         print(file)
-
+        if '.ipps' not in file:
+            continue
         file_path = os.path.join(file_folder, file)
         save_path = os.path.join(save_folder, "o2d_sol_" + file)
         ws_path = os.path.join(ws_folder, "ws_sol_" + file) if ws_folder is not None else ''
 
         # check if the solution file already exists, if so, skip this file.
         split_path = save_path.split('.')
-        save_path_optimal = split_path[0] + '_optimal.' + split_path[1]
-        save_path_infeasible = split_path[0] + '_infeasible.' + split_path[1]
-        save_path_error = split_path[0] + '_error.' + split_path[1]
+        save_path_optimal = split_path[0] + '_optimal.' + 'sol'
+        save_path_infeasible = split_path[0] + '_infeasible.' + 'sol'
+        save_path_error = split_path[0] + '_error.' + 'sol'
         if os.path.exists(save_path) or os.path.exists(save_path_optimal) or \
             os.path.exists(save_path_infeasible) or os.path.exists(save_path_error):
             print(f"{save_path} already exists. Skipping this file.")

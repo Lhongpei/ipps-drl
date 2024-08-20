@@ -116,7 +116,7 @@ def solve_ipps_with_gurobi(id_job, id_machine, id_operation, id_set_operation, i
         if save_path:
             if status == GRB.OPTIMAL:
                 split_path = save_path.split('.')
-                save_path = split_path[0] + '_optimal.' + split_path[1]
+                save_path = split_path[0] + '_optimal.' + 'sol'
             schedule = sorted(schedule, key=lambda x: x[3])
             with open(save_path, 'w') as file:
                 file.write(str(makespan.x) + '\n')
@@ -128,7 +128,7 @@ def solve_ipps_with_gurobi(id_job, id_machine, id_operation, id_set_operation, i
     else:
         print("No feasible solution found.")
         split_path = save_path.split('.')
-        save_path = split_path[0] + '_infeasible.' + split_path[1]
+        save_path = split_path[0] + '_infeasible.' + 'sol'
         with open(save_path, 'w') as file:
             file.write("Infeasible")
 
@@ -153,9 +153,9 @@ if __name__ == '__main__':
 
         # Check if the solution file already exists, if so, skip this file.
         split_path = save_path.split('.')
-        save_path_optimal = split_path[0] + '_optimal.' + split_path[1]
-        save_path_infeasible = split_path[0] + '_infeasible.' + split_path[1]
-        save_path_error = split_path[0] + '_error.' + split_path[1]
+        save_path_optimal = split_path[0] + '_optimal.' + 'sol'
+        save_path_infeasible = split_path[0] + '_infeasible.' + 'sol'
+        save_path_error = split_path[0] + '_error.' + 'sol'
         if os.path.exists(save_path) or os.path.exists(save_path_optimal) or \
            os.path.exists(save_path_infeasible) or os.path.exists(save_path_error):
             print(f"{save_path} already exists. Skipping this file.")
