@@ -36,7 +36,7 @@ The environment and other utils for data are implemented under `./env/` includin
 
 `./env/ipps_env.py` contains `IPPSEnv` a class of the environment containing the following function:
 
-- `self.__init__`: Initialize the environment by the received problem that can be fjsp or ipps.
+- `self.__init__`: Initialize the environment by the received problem which can be the fjsp or ipps.
 
 - `self.step`: Update the environment according to the action.
 
@@ -78,9 +78,27 @@ python ipps_ortools_solve.py \  # Run the ipps_ortools_solve.py script
   --workers=<workers>  # Specify the number of worker threads
 ```
 
-## Training Phase
+## Train and Test
 
-`./train_bc` and `./train_drl` are scripts to use Behavior Cloning and PPO to train models, respectively.
+`./train_bc.py` and `./train_drl.py` are scripts to use Behavior Cloning and PPO to train models, respectively.
+
+`./text.py` is a script used to test.
+
+All parameters and paths should be set in `./config.yaml`. We use [Weights & Biases (wandb)](https://wandb.ai/) to log the training process, which can be closed in these scripts by setting `use_wandb = False`.
+
+## Requirements
+
+Please refer to `./requirements.txt`.
+
+## File Format
+
+To our best-known, there isn't a file format to store an IPPS problem, because of the complexity of the job scheduling graph. So, we suggest a file format to store the IPPS problem. In addition, we suggest a file for the IPPS solution used for Behavior Cloning.
+
+### problem(.ipps)
+
+Consider the following simple problem with 2 jobs:
+
+<img src="example/pic/job.png" alt="Job Image" width="300" height="270">
 
 ## Reference
 
