@@ -94,7 +94,7 @@ Please refer to `./requirements.txt`.
 
 To our best-known, there isn't a file format to store an IPPS problem, because of the complexity of the job scheduling graph. So, we suggest a file format to store the IPPS problem. In addition, we suggest a file for the IPPS solution used for Behavior Cloning.
 
-### problem(.ipps)
+### Problem(.ipps)
 
 There are 4 parts in our file format:
 
@@ -103,7 +103,11 @@ There are 4 parts in our file format:
 3. Join: This part is used to store the join nodes and starts with a line of `in`. In each line, `a (b,c)` means that b and c are the last operations in 2 OR braches and join to a.
 4. Processing time: This part starts with a line of `info`. Each later line starts with the machine's IDs. The second element `n` notes how many operations this machine can process, and then fills `2n` elements, where 2i-1 th and 2i th elements note an operation ID and the processing time.
 
-**Example**:
+### Solution(.ippssol)
+
+The file stores a solution starting with a line of total makespan, and each line is later formatted as `[Operation] [Machine] [Job] [Start_time] [End_time]` for one schedule.
+
+### Example
 
 Consider the following simple problem with 2 jobs and 2 machines:
 
@@ -111,7 +115,7 @@ Consider the following simple problem with 2 jobs and 2 machines:
 
 "-" means that this machine can not process this operation.
 
-The file store this simple problem is `./example/problem.ipps`.
+The file stores this simple problem can be found in  `./example/problem.ipps` and `./example/problem.ippssol`.
 
 ## Reference
 
