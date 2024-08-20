@@ -105,7 +105,7 @@ There are 4 parts in our file format:
 
 ### Solution(.ippssol)
 
-The file stores a solution starting with a line of total makespan, and each line is later formatted as `[Operation] [Machine] [Job] [Start_time] [End_time]` for one schedule.
+The file stores a solution starting with a line of total makespan, and each line is later formatted as `[Operation] [Machine] [Job] [Start_time] [End_time]` for each schedule.
 
 ### Example
 
