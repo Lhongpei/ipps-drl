@@ -88,7 +88,7 @@ def sort_sols(origin_sol_folder, pro_folder, to_sol_folder):
         os.makedirs(to_sol_folder)
     for sol_file in os.listdir(origin_sol_folder):
         prefix = sol_file[:-4]
-        pro_file = (prefix[8:-8] if prefix.endswith("_optimal") else prefix[8:]) + ".txt"
+        pro_file = (prefix[8:-8] if prefix.endswith("_optimal") else prefix[8:]) + ".ipps"
         pro_path = os.path.join(pro_folder, pro_file)
         if not os.path.exists(pro_path):
             raise Warning("No problem file.")
