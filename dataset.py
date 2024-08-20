@@ -60,7 +60,7 @@ class ILDataScheduler:
         list_pros = os.listdir(self.dir_pros) if dir_pros is None else os.listdir(dir_pros)
 
         for sol in list_sols:
-            prefix = sol[:-4]
+            prefix = sol[:-8]
             prefix = prefix[8:-8] if prefix.endswith("_optimal") else prefix[8:]
             pro = prefix + ".ipps"
             assert pro in list_pros, 'No relative problem.'
