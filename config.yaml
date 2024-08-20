@@ -45,7 +45,6 @@ IL_paras:
 test_paras:
   if_draw_gantt: false  # Draw Gantt chart or not
   if_save_sols: true  # Save the solution or not
-  num_ins: 100  # Number of instances in this test set
   rules:
     - DRL  # The rule used to test
   sample: true  # Turn on the DRL-S mode

@@ -41,12 +41,6 @@ class Policy(torch.nn.Module):
             self.key4wait_linear = nn.Linear(self.actor.actor[0].in_features, self.actor.actor[0].in_features)
             self.value_linear = nn.Linear(self.actor.actor[0].in_features, self.actor.actor[0].in_features)
             self.value4wait_linear = nn.Linear(self.actor.actor[0].in_features, self.actor.actor[0].in_features)
-        
-        self.emb_qkv = config.emb_qkv
-        if self.emb_qkv:
-            self.emb_query = nn.Linear(config.graph_embedding.hidden_dim * 3, config.graph_embedding.hidden_dim * 3)
-            self.emb_key = nn.Linear(config.graph_embedding.hidden_dim * 3, config.graph_embedding.hidden_dim * 3)
-            self.emb_value = nn.Linear(config.graph_embedding.hidden_dim * 3, config.graph_embedding.hidden_dim * 3)
         self.device = config.device
         
         
