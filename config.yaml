@@ -60,7 +60,6 @@ nn_paras:
   wait_flag: true  # Whether to use the wait
   wait_deal: softmax  # How to deal with the wait
   qkv: false
-  emb_qkv: false
   graph_embedding:
     model: GAT # in ['HGT', 'GAT', 'HAN']
     opes_dim: 5
