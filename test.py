@@ -121,8 +121,8 @@ def main():
             test_file = os.path.join(data_path, test_files[i_ins])
             print('test_file:', test_file)
             if has_lb:
-                lb_file = os.path.join(lb_path, 'o2d_sol_' + '_optimal.'.join(test_files[i_ins].split('.')))
-                lb_file = os.path.join(lb_path, 'o2d_sol_' + test_files[i_ins]) if not os.path.exists(lb_file) else lb_file
+                lb_file = os.path.join(lb_path, 'o2d_sol_' + '_optimal.'.join(test_files[i_ins].split('.') + 'sol'))
+                lb_file = os.path.join(lb_path, 'o2d_sol_' + test_files[i_ins] + 'sol') if not os.path.exists(lb_file) else lb_file
             with open(test_file, ) as file_object:
                 line = file_object.read().splitlines()
                 ins_num_jobs, ins_num_mas, _ = nums_detec(line)
@@ -202,7 +202,7 @@ def main():
                 for row in best_sol:
                     formatted_row = f"{int(row[0]):d} {int(row[1]):d} {int(row[2]):d} {row[3]} {row[4]}"
                     formatted_data.append(formatted_row)
-                with open(os.path.join(solution_path, 'drl_sol_' + test_files[i_ins]), "w") as file:
+                with open(os.path.join(solution_path, 'drl_sol_' + test_files[i_ins] + 'sol'), "w") as file:
                     # Transpose the solution to separate operation, machines, and jobs
                     file.write(str(best_makespan) + "\n")
                     file.write("\n".join(formatted_data))
