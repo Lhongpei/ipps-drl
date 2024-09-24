@@ -67,6 +67,7 @@ def main():
     test_files = test_files[:num_ins]
     mod_files = os.listdir('./model/')
     if_save_sols = test_paras["if_save_sols"]
+    shrink = test_paras["shrink_trick"]
 
     memories = MemoryRL()
     model = PPO(model_paras, train_paras)
@@ -156,7 +157,7 @@ def main():
                 best_makespan = float('inf')
                 for j in range(test_paras["num_average"]):
                     makespan, time_re, sol = schedule(env, model, memories, flag_sample=test_paras["sample"],
-                                                      save_sols = if_save_sols, shrink = True)
+                                                      save_sols = if_save_sols, shrink = shrink)
                     makespan_s.append(makespan)
                     if torch.min(makespan) < best_makespan:
                         best_makespan = torch.min(makespan).item()
@@ -243,7 +244,7 @@ def schedule(env:IPPSEnv, model, memories, flag_sample=False, save_sols = False,
         for j in range(env.num_ope_biases_batch[i].size(0)):
             steps_act[state.batch_idxes[i]].append([env.num_ope_biases_batch[i, j].item(), 0, 0])
             
-    while ~done:
+    while not done:
         i += 1
         with torch.no_grad():
             actions = model.policy_old.act(state, memories, flag_sample=flag_sample, flag_train=False)
@@ -263,7 +264,7 @@ def schedule(env:IPPSEnv, model, memories, flag_sample=False, save_sols = False,
                                             ignore_supernode = True, return_sol = True)
             makespan_batch[i] = makespan
             sols.append(sol)
-        print(env.makespan_batch - makespan_batch)
+
     # Verify the solution
     gantt_result = env.validate_gantt()[0]
     if not gantt_result:
