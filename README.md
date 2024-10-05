@@ -3,7 +3,7 @@
 
 ## Introduction
 
-In this repository, we implement a DRL environment used for Integrated processing plans and scheduling problems. Our environment supports GPU parallel and returns a graph type as states used in both the DRL algorithm and greedy dispatching rules. Also, we implement functions to simulate the dynamic real world including adding new jobs and varying processing time during scheduling. All baselines and suggested methods can be found in this repository.
+This is official implementation of [Solving Integrated Process Planning and Scheduling Problem via Graph Neural Network Based Deep Reinforcement Learning](https://arxiv.org/abs/2409.00968). In this repository, we implement a DRL environment used for Integrated processing plans and scheduling problems. Our environment supports GPU parallel and returns a graph type as states used in both the DRL algorithm and greedy dispatching rules. Also, we implement functions to simulate the dynamic real world including adding new jobs and varying processing time during scheduling. All baselines and suggested methods can be found in this repository.
 
 ### DRL and IL implementation
 
