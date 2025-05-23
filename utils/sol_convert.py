@@ -1,9 +1,11 @@
 import numpy as np
 import os
+import sys
 
 from utils.get_possible_set import get_comb_info
 from env.load_data import nums_detec, load_ipps
 from utils.utils import sort_schedule, getAncestors
+
 
 
 
@@ -29,7 +31,7 @@ def drl_to_ws(data_path, problem):
     matrix_ope_ma_adj = tensor[1].tolist()
 
     # read drl solution file
-    drl_sol_file = data_path + "/drl_solution/drl_sol_" + problem
+    drl_sol_file = data_path + "/drl_solution/drl_sol_" + problem + 'sol'
     with open(drl_sol_file, 'r') as file_object:
         sol_lines = file_object.read().splitlines()
         makespan = round(float(sol_lines[0]))
@@ -68,7 +70,8 @@ def drl_to_ws(data_path, problem):
         complete_times[(job_id, comb_i[job_id], ope_id)] = complete_time
 
     # output
-    with open(os.path.join(folder, 'ws_sol_' + problem), "w") as file:
+    ws_name = "ws_sol_" + problem.split('.')[0] + ".ws"
+    with open(os.path.join(folder, ws_name), "w") as file:
         file.write(f"# Objective value {makespan}\nmakespan\t\t\t{makespan}\n")
         for key, value in combination.items():
             key_str = ','.join(map(str, key))
@@ -126,3 +129,4 @@ if __name__ == "__main__":
     pro_folder = "IL_test/0505/problem"
     to_sol_folder = "IL_test/0505/correct_solution"
     sort_sols(origin_sol_folder, pro_folder, to_sol_folder)
+

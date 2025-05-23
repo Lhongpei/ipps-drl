@@ -33,7 +33,7 @@ def validate(env_paras, env, model_policy, DRL = True, draw = False, gantt_path 
     done = False
     dones = env.done_batch
     model_policy.eval()
-    while ~done:
+    while not done:
         with torch.no_grad():
             if DRL:
                 actions = model_policy.act(state, memory, flag_sample = False, flag_train = False)

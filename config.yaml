@@ -50,8 +50,9 @@ test_paras:
   num_sample: 25  # Number of copied instances to sample for DRL-S
   num_average: 2  # Number of loops in DRL-G to calculate the mean
   public_ins: true  # Instances from well-known benchmarks or not
-  data_path: "2025"  # Relative path of this test set
+  data_path: "kim"  # Relative path of this test set
   record_sol: true
+  shrink_trick: false # use a simple shrink trick to remove the redundant supernodes
 
 nn_paras:
   pooling_method: mean # Method to pool the node features ['mean', 'sum', 'max'] and ['attention']
