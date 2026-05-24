@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ipps-drl"
+version = "0.1.0"
+description = "Graph neural network + deep reinforcement learning for Integrated Process Planning and Scheduling."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+keywords = ["reinforcement-learning", "graph-neural-network", "scheduling", "ipps", "operations-research"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dynamic = ["dependencies"]
+
+[project.urls]
+"Homepage" = "https://github.com/Lhongpei/ipps-drl"
+"Paper" = "https://arxiv.org/abs/2409.00968"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ipps_drl*"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }

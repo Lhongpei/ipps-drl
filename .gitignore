@@ -1,5 +1,33 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+src/*.egg-info/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Project-specific artifacts ---
 *.ippssol
 *.ws
-*.pyc
 *.csv
-test/*
+save/
+wandb/
+runs/
+
+# Personal / experimental data that shouldn't ship with the repo
+IL_test/
+test/shangfei_data/
+
+# Local notes, scratch
+TODO.local.md
+*.local.*
