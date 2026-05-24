@@ -31,3 +31,7 @@ test/shangfei_data/
 # Local notes, scratch
 TODO.local.md
 *.local.*
+test/*
+
+# mkdocs build output
+site/

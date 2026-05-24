@@ -1,0 +1,66 @@
+site_name: IPPS-DRL
+site_description: GNN-based deep reinforcement learning for Integrated Process Planning and Scheduling.
+site_url: https://lhongpei.github.io/ipps-drl/
+repo_url: https://github.com/Lhongpei/ipps-drl
+repo_name: Lhongpei/ipps-drl
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - search.highlight
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Inference: inference.md
+  - Training: training.md
+  - Generators: generators.md
+  - Architecture: architecture.md
+  - File format: file-format.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Lhongpei/ipps-drl
+    - icon: fontawesome/solid/file-lines
+      link: https://arxiv.org/abs/2409.00968
+      name: Paper
