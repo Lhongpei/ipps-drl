@@ -155,15 +155,10 @@ def generate_matrices(lines, given_num_mas=None):
         remain_opes
     )
 
-def nums_detec(lines):
-    '''
-    Count the number of jobs, machines and operations
-    :param lines: List of strings, each string is a line of input data representing job-shop scheduling information
-    :return: Tuple of (num_jobs, num_machines, num_opes)
-    '''
-    num_jobs, num_machines, num_opes = map(int, lines[0].split())
+# Re-exported from utils.utils to keep the historical
+# ``from ipps_drl.env.load_data import nums_detec`` import path working.
+from ipps_drl.utils.utils import nums_detec  # noqa: F401,E402
 
-    return num_jobs, num_machines, num_opes
 
 def main():
     with open(file_path, 'r') as file:

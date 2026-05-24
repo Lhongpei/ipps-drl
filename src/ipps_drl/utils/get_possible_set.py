@@ -1,10 +1,10 @@
-import networkx as nx
-import matplotlib.pyplot as plt
 from itertools import product
+
+import networkx as nx
 import numpy as np
 import torch
-from ipps_drl.utils.utils import getAncestors, parse_data, getAdjacent, nums_detec
-from itertools import product
+
+from ipps_drl.utils.utils import getAncestors, getAdjacent, nums_detec, parse_data
 
 
 def read_ipps_data(file_path, matrix_proc_time, matrix_ope_ma_adj,  id_operation):
@@ -75,41 +75,11 @@ def read_ipps_sol(sol_path, instance_num):
 
     return start_times, end_times, assignment, durations, makespan
 
-def build_graph(data):
-    out_lines, in_lines, _ = parse_data(data)
-    _, _, num_opes = nums_detec(data)
-    adjacent, or_edge = getAdjacent(out_lines, num_nodes=num_opes, or_successors=False)
-    graph = nx.DiGraph(adjacent.to('cpu').numpy())  
-    return graph
 
 def get_subgraphs(graph):
+    """Return one subgraph per weakly-connected component (used by ``comb_matrix_core``)."""
     connected_components = list(nx.weakly_connected_components(graph))
-
-    subgraphs = [graph.subgraph(nodes) for nodes in connected_components]
-
-    return subgraphs
-
-
-
-
-def visualize_graph(graph):
-    pos = nx.nx_agraph.graphviz_layout(graph, prog='dot')
-
-    plt.figure(figsize=(15, 10))
-
-    nx.draw(graph, pos, with_labels=True, node_size=2000,
-            node_color="lightblue", font_size=10, font_weight="bold", arrowsize=20)
-
-    edge_labels = {}
-    for u, v, d in graph.edges(data=True):
-        if 'label' in d:
-            edge_labels[(u, v)] = d['label']
-        else:
-            edge_labels[(u, v)] = ''  
-    nx.draw_networkx_edge_labels(graph, pos, edge_labels=edge_labels)
-
-    plt.title("Job Workflow")
-    plt.show()
+    return [graph.subgraph(nodes) for nodes in connected_components]
 
 
 def get_set(problem):

@@ -17,8 +17,6 @@ from omegaconf import OmegaConf
 from ipps_drl.env.ipps_env import IPPSEnv
 from ipps_drl.utils.trick import shrink_schedule
 from collections import defaultdict
-sys.path.append('.')
-sys.path.append('..')
 
 from ipps_drl.utils.draw_gantt import draw_sol_gantt
 

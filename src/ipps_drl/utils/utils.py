@@ -4,13 +4,7 @@ from collections import deque
 import numpy as np
 from functools import cmp_to_key
 from torch.nn.utils.rnn import pad_sequence
-def human_readable_size(size, decimal_places=2):
-    """Convert a size in bytes to a human-readable string."""
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-        if size < 1024:
-            return f"{size:.{decimal_places}f} {unit}"
-        size /= 1024
-    return f"{size:.{decimal_places}f} TB"
+
 
 def pad_2d_tensors(tensors, value=0, pad_dim=1, given_size=None):
     """
@@ -126,20 +120,6 @@ def pad_1d_tensors(tensors, value=0, given_size=None):
     
     stacked_tensors = torch.stack(padded_tensors, dim=0)
     return stacked_tensors
-
-def wait_noneligible(state):
-    machine_avail_time = state.machines_batch[:, :, 1]
-    # available_time of jobs
-    job_avail_time = state.job_end_time_batch
-    # remain available_time greater than current time
-    expanded_time = state.time_batch.unsqueeze(1)  # shape: (batch_size, 1)
-
-    ma_jump = machine_avail_time > expanded_time
-    job_jump = job_avail_time > expanded_time
-
-    eligible_index = (torch.any(ma_jump, dim=1) | torch.any(job_jump, dim=1)).view(-1)
-    return torch.where(eligible_index[state.batch_idxes], 0, 1)
-
 
 def find_action_indexes(eligible_pair, selected_pair):
 
@@ -266,13 +246,10 @@ def parse_data(lines):
     return out_lines, in_lines, info_lines
 
 def nums_detec(lines):
-    '''
-    Count the number of jobs, machines and operations
-    :param lines: List of strings, each string is a line of input data representing job-shop scheduling information
-    :return: Tuple of (num_jobs, num_machines, num_opes)
-    '''
+    """Read ``num_jobs num_machines num_opes`` from the first line of an .ipps file."""
     num_jobs, num_machines, num_opes = map(int, lines[0].split())
     return num_jobs, num_machines, num_opes
+
 
 def sort_schedule(schedule, matrix_cal_cumul):
     def compare(x, y):
