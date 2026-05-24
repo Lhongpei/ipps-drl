@@ -2,3 +2,4 @@
 *.ws
 *.pyc
 *.csv
+test/*

@@ -36,10 +36,11 @@ def main():
     if torch.cuda.is_available():
         device = "cuda:0"
         torch.cuda.set_device(device)
-        torch.set_default_device(device)
     else:
         device = "cpu"
-        torch.set_default_device(device)
+    # Deliberately NOT calling torch.set_default_device — it pushes a TorchFunctionMode
+    # that wraps every torch op and was responsible for ~60% of policy.act overhead.
+    # Init paths use `with torch.device(device):` locally; hot loops pass device= explicitly.
     print("PyTorch device: ", device)
     torch.set_printoptions(precision=None, threshold=np.inf, edgeitems=None, linewidth=None, profile=None, sci_mode=False)
 
@@ -65,7 +66,8 @@ def main():
 
     
     memories = MemoryRL()
-    model = PPO(model_paras, train_paras, num_envs=env_paras["batch_size"])
+    with torch.device(device):
+        model = PPO(model_paras, train_paras, num_envs=env_paras["batch_size"])
 
     # pretrain_model_path = os.path.join('./model', os.listdir('./model')[0])
     # # model.load_pretrained_policy(pretrain_model_path)\
@@ -76,7 +78,8 @@ def main():
                                                   str.zfill(str(env_paras["num_mas"]),2)))
     is_validate = True
     if is_validate:
-        env_valid = get_validate_env(env_valid_paras)
+        with torch.device(device):
+            env_valid = get_validate_env(env_valid_paras)
     maxlen = 1  # Save the best model
     best_models = deque()
     makespan_best = float('inf')

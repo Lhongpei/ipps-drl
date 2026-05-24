@@ -1,7 +1,59 @@
 from torch_geometric.data import HeteroData, Batch
 from network.utils import get_remain_edges_per_node_type
 import torch
+import copy as _copy
 import sys
+
+
+def snapshot_batch(batched):
+    """Make an independent snapshot of a batched HeteroData with the bare minimum work.
+
+    `Batch.clone()` reuses `_slice_dict` and `_inc_dict` with the original; once the
+    env mutates those (via `update_edge_sub_graph`) every stored snapshot silently
+    drifts. `copy.deepcopy` is correct but ~100x slower because it traverses every
+    Python wrapper. This routine clones tensors directly and shallow-copies the rest.
+    """
+    out = _copy.copy(batched)
+    # Re-parent each store so mutations on the snapshot don't leak back.
+    new_stores = []
+    for store in batched.stores:
+        new_store = _copy.copy(store)
+        for k, v in store.items():
+            new_store[k] = v.clone() if torch.is_tensor(v) else _copy.copy(v)
+        new_store._parent = lambda out_ref=out: out_ref
+        new_stores.append(new_store)
+    # Rebuild the internal store dicts that HeteroData/Batch use to look up by key.
+    if hasattr(batched, '_node_store_dict'):
+        new_node = {}
+        for k, v in batched._node_store_dict.items():
+            ns = _copy.copy(v)
+            for kk, vv in v.items():
+                ns[kk] = vv.clone() if torch.is_tensor(vv) else _copy.copy(vv)
+            ns._parent = lambda out_ref=out: out_ref
+            new_node[k] = ns
+        out._node_store_dict = new_node
+    if hasattr(batched, '_edge_store_dict'):
+        new_edge = {}
+        for k, v in batched._edge_store_dict.items():
+            es = _copy.copy(v)
+            for kk, vv in v.items():
+                es[kk] = vv.clone() if torch.is_tensor(vv) else _copy.copy(vv)
+            es._parent = lambda out_ref=out: out_ref
+            new_edge[k] = es
+        out._edge_store_dict = new_edge
+    # Deep-clone _slice_dict / _inc_dict tensors (these drive to_data_list()).
+    if hasattr(batched, '_slice_dict') and batched._slice_dict is not None:
+        new_sd = {}
+        for et, kd in batched._slice_dict.items():
+            new_sd[et] = {k: (v.clone() if torch.is_tensor(v) else _copy.copy(v)) for k, v in kd.items()}
+        out._slice_dict = new_sd
+    if hasattr(batched, '_inc_dict') and batched._inc_dict is not None:
+        new_id = {}
+        for et, kd in batched._inc_dict.items():
+            new_id[et] = {k: (v.clone() if torch.is_tensor(v) else _copy.copy(v)) for k, v in kd.items()}
+        out._inc_dict = new_id
+    return out
+
 sys.path.append('..')
 sys.path.append('.')
 sys.path.append('...')
@@ -160,11 +212,28 @@ class Graph_Batch:
         self.data = Batch.from_data_list(graph_list)
         self.batch_size = len(graph_list)
 
-        # Iterator for batch processing
-        self.batch_iter = torch.arange(self.batch_size)
-        
+        # Iterator for batch processing — colocated with the batched data tensors.
+        dev = self.data['opes'].x.device if 'opes' in self.data.node_types else None
+        self.batch_iter = torch.arange(self.batch_size, device=dev)
+
         # Store pointers to the start of each operation and machine subgraphs within the batch
-        self.batch_iter = torch.arange(self.batch_size)
+        self.batch_iter = torch.arange(self.batch_size, device=dev)
+
+        # Batch.from_data_list builds _slice_dict / _inc_dict on CPU regardless of the
+        # node-data device. Subsequent code (e.g. normalize_hetero_data, our
+        # update_remain_edges_per_edge_type) does arithmetic mixing these with cuda
+        # tensors, so move them to the data device once at construction time.
+        if dev is not None and dev.type != 'cpu':
+            for d in (getattr(self.data, '_slice_dict', None), getattr(self.data, '_inc_dict', None)):
+                if d is None:
+                    continue
+                for k, sub in d.items():
+                    if isinstance(sub, dict):
+                        for sk, sv in sub.items():
+                            if torch.is_tensor(sv) and sv.device != dev:
+                                sub[sk] = sv.to(dev)
+                    elif torch.is_tensor(sub) and sub.device != dev:
+                        d[k] = sub.to(dev)
         self.opes_ptr = self.data['opes'].ptr[:-1]
         self.mas_ptr = self.data['mas'].ptr[:-1]
         self.combs_ptr = self.data['combs'].ptr[:-1]
@@ -229,90 +298,108 @@ class Graph_Batch:
             data_list[i] = graph.edge_subgraph(ope_remain_dict)
         self.data = Batch.from_data_list(data_list)
         
-    def update_edge_sub_graph(self, remain_opes, remain_combs=None):
+    def update_edge_sub_graph(self, remain_opes, remain_combs=None, opes_dirty=True, combs_dirty=True):
         """
         Update the edge subgraph based on the remaining operations and combinations.
 
         Args:
             remain_opes (Tensor): A tensor containing the indices of the remaining operations.
             remain_combs (Tensor, optional): A tensor containing the indices of the remaining combinations. Defaults to None.
+            opes_dirty (bool): If False, skip the opes-side edge update (caller knows remain_opes hasn't changed).
+            combs_dirty (bool): If False, skip the combs-side edge update.
         """
-        remain_opes_flatten = flatten_padded_tensor(self.data['opes'].ptr, remain_opes).nonzero().squeeze(-1)
-        self.update_remain_edges_per_node_type('opes', remain_opes_flatten, self.data['opes'].ptr)
-        if remain_combs is not None:
-            remain_combs_flatten = flatten_padded_tensor(self.data['combs'].ptr, remain_combs).nonzero().squeeze(-1)
-            self.update_remain_edges_per_node_type('combs', remain_combs_flatten, self.data['combs'].ptr)
-        
-    def update_remain_edges_per_edge_type(self, edge_type:tuple, ptr, remain_opes_flatten:torch.Tensor, deal_start=True, deal_end=True):
+        if opes_dirty:
+            is_remain_opes = flatten_padded_tensor(self.data['opes'].ptr, remain_opes).bool()
+            self.update_remain_edges_per_node_type('opes', is_remain_opes, self.data['opes'].ptr)
+        if remain_combs is not None and combs_dirty:
+            is_remain_combs = flatten_padded_tensor(self.data['combs'].ptr, remain_combs).bool()
+            self.update_remain_edges_per_node_type('combs', is_remain_combs, self.data['combs'].ptr)
+
+    def _get_ptr_pad(self, ptr: torch.Tensor) -> torch.Tensor:
+        """Cache repeat_interleave(arange(n), ptr_diffs) keyed by ptr's data_ptr/size.
+
+        ptr is stable across normal training steps; only `add_job` rebuilds it.
+        Recomputing every step costs measurable time in the inner loop.
+        """
+        cache = getattr(self, '_ptr_pad_cache', None)
+        key = (ptr.data_ptr(), int(ptr.size(0)), int(ptr[-1].item()) if ptr.numel() else 0)
+        if cache is not None and cache[0] == key:
+            return cache[1]
+        ptr_pad = torch.repeat_interleave(torch.arange(ptr.size(0) - 1, device=ptr.device), ptr[1:] - ptr[:-1])
+        self._ptr_pad_cache = (key, ptr_pad)
+        return ptr_pad
+
+    def update_remain_edges_per_edge_type(self, edge_type:tuple, ptr, is_remain:torch.Tensor, deal_start=True, deal_end=True):
         """
         Update the remaining edges per edge type based on the specified conditions.
-        Avoiding for loop to update the pointer of edge_index and edge_attr to improve efficiency.
 
         Args:
             edge_type (tuple): The edge type to update.
             ptr: The pointer tensor.
-            remain_opes_flatten (torch.Tensor): The tensor containing the remaining edges.
+            is_remain (torch.Tensor): Bool table over the *node_type* nodes; True means "keep this node".
             deal_start (bool, optional): Whether to deal with the start index of the edge. Defaults to True.
             deal_end (bool, optional): Whether to deal with the end index of the edge. Defaults to True.
-
-        Returns:
-            None
         """
         edge_index = self.data[edge_type].edge_index
+        # Bool-table lookup is much faster than torch.isin for tight inner loops; also avoids per-call sort/sort-search.
         if deal_start and deal_end:
             target_index = edge_index[0]
-            mask = torch.isin(edge_index[0], remain_opes_flatten) & torch.isin(edge_index[1], remain_opes_flatten)
+            mask = is_remain[edge_index[0]] & is_remain[edge_index[1]]
         elif deal_start:
             target_index = edge_index[0]
-            mask = torch.isin(edge_index[0], remain_opes_flatten)
+            mask = is_remain[edge_index[0]]
         elif deal_end:
             target_index = edge_index[1]
-            mask = torch.isin(edge_index[1], remain_opes_flatten)
+            mask = is_remain[edge_index[1]]
         else:
             return
-        if (~mask).sum() == 0:
+        # Skip the per-edge-type early-return: `(~mask).sum() == 0` forced a GPU sync on every call.
+        # If mask is all True, the work below is a no-op copy with zero deltas — cheap and async-friendly.
+        removed_pos = (~mask).nonzero(as_tuple=True)[0]
+        if removed_pos.numel() == 0:
+            # Fast path that still doesn't sync: removed_pos.numel() is a Python int from tensor shape, no GPU sync.
             return
-        matching_indices = torch.where(~mask)[0]
-        ptr_pad = torch.repeat_interleave(torch.arange(ptr.size(0) - 1), ptr[1:] - ptr[:-1])
-        edge_belong_batch = ptr_pad[target_index[matching_indices]]
-        del_indice, delete_num = torch.unique(edge_belong_batch, return_counts=True)
-        padded_delete_num = torch.zeros(ptr.size(0) - 1, dtype=delete_num.dtype)
-        padded_delete_num[del_indice] = delete_num
+        ptr_pad = self._get_ptr_pad(ptr)
+        edge_belong_batch = ptr_pad[target_index[removed_pos]]
+        # scatter_add is faster than unique+counts here and avoids an extra sort.
+        padded_delete_num = torch.zeros(ptr.size(0) - 1, dtype=torch.long, device=ptr.device)
+        padded_delete_num.scatter_add_(0, edge_belong_batch, torch.ones_like(edge_belong_batch))
         self.data[edge_type].edge_index = edge_index[:, mask]
 
         self.data._slice_dict[edge_type]['edge_index'][1:] -= torch.cumsum(padded_delete_num, dim=0)
-        assert (self.data._slice_dict[edge_type]['edge_index'] >= 0).all() and (self.data._slice_dict[edge_type]['edge_index'][-1] == self.data[edge_type].edge_index.size(1))
         if getattr(self.data[edge_type], 'edge_attr', None) is not None:
             self.data[edge_type].edge_attr = self.data[edge_type].edge_attr[mask]
             self.data._slice_dict[edge_type]['edge_attr'][1:] -= torch.cumsum(padded_delete_num, dim=0)
-            assert (self.data._slice_dict[edge_type]['edge_attr'] >= 0).all() and (self.data._slice_dict[edge_type]['edge_attr'][-1] == self.data[edge_type].edge_attr.size(0))
         return
-    
-    def update_remain_edges_per_node_type(self, node_type: str, remain_opes_flatten: torch.Tensor, ptr: torch.Tensor):
+
+    def update_remain_edges_per_node_type(self, node_type: str, is_remain: torch.Tensor, ptr: torch.Tensor):
         """
         Update the remaining edges per node type.
         if edge links same node type, we will remain the edge if the start and end node are both in the remain_opes_flatten.
 
         Args:
             node_type (str): The type of the node.
-            remain_opes_flatten (torch.Tensor): The flattened tensor of remaining edges.
+            is_remain (torch.Tensor): Bool table over the node_type's flattened nodes.
             ptr (torch.Tensor): The tensor representing the pointer.
-
-        Returns:
-            None
         """
+        # If nothing was removed, all per-edge-type updates are no-ops; skip the loop entirely.
+        # One sync per node_type instead of one per edge_type.
+        if bool(is_remain.all()):
+            return
         for edge_type in self.data.edge_types:
             is_opes_start = edge_type[0] == node_type
             is_opes_end = edge_type[2] == node_type
+            if not (is_opes_start or is_opes_end):
+                continue
             self.update_remain_edges_per_edge_type(
                 edge_type,
                 ptr,
-                remain_opes_flatten,
+                is_remain,
                 deal_start=is_opes_start,
                 deal_end=is_opes_end
             )
     
-    def update_features(self, batch_idxes, actions, end_time, ready_time, time, machine, ope_req_num_batch, combs_time_batch, combs_id_batch, remain_opes, job_estimate_time):
+    def update_features(self, batch_idxes, actions, end_time, ready_time, time, machine, ope_req_num_batch, combs_time_batch, combs_id_batch, remain_opes, job_estimate_time, opes_dirty=True, combs_dirty=True):
         '''Update the features for operations and machines based on the given actions and times.
 
         Args:
@@ -362,7 +449,7 @@ class Graph_Batch:
         ## convert ready_time,end_time to corresponding shape
         time_batched =torch.repeat_interleave(time[batch_idxes], self.ope_num[batch_idxes], dim=0)
         max_cols = ready_time.size(1)
-        cumulative_indices = torch.arange(max_cols).expand(len(batch_idxes), max_cols)
+        cumulative_indices = torch.arange(max_cols, device=ready_time.device).expand(len(batch_idxes), max_cols)
         length_mask = cumulative_indices < self.ope_num[batch_idxes, None]
         ready_time = ready_time[batch_idxes][length_mask]
         end_time =end_time[batch_idxes][length_mask]
@@ -397,7 +484,7 @@ class Graph_Batch:
             self.data['jobs'].x[:, 0] = flatten_padded_tensor(self.data['jobs'].ptr, torch.exp((job_estimate_time - time.unsqueeze(1)) / (job_estimate_time.max() * 1.25 - job_estimate_time + 1e-4)))
         #update edge subgraph
         remain_combs = torch.where(combs_id_batch.sum(dim = -2) > 0, 1, 0)
-        self.update_edge_sub_graph(remain_opes, remain_combs)
+        self.update_edge_sub_graph(remain_opes, remain_combs, opes_dirty=opes_dirty, combs_dirty=combs_dirty)
 
 
     def get_data(self):

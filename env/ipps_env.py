@@ -89,6 +89,10 @@ class IPPSEnv:
         self.N = 0
         # graph
         self.graph = Graph_Batch()
+        # All __init__ tensor allocations should land on the same device. Using a
+        # local torch.device context here avoids passing device= to every factory below.
+        self._init_dev_ctx = torch.device(self.device)
+        self._init_dev_ctx.__enter__()
         # load instance
         num_data = 13 # The amount of data extracted from instance
         tensors = [[] for _ in range(num_data)]
@@ -253,9 +257,23 @@ class IPPSEnv:
 
         self.graph.init_from_graph_list(graph_list, self.combs_time_batch, self.remain_opes_batch, self.job_estimate_end_batch)
 
+        # Dirty flags for graph edge-subgraph updates. Set whenever the underlying
+        # remain_opes_batch / combs_id_batch tensors are mutated, cleared after the
+        # graph consumes them in update_graph. This lets us skip ~10 torch.isin calls
+        # per step when nothing changed.
+        self._remain_opes_dirty = True
+        self._combs_id_dirty = True
+        # Memoizes find_eligible_pairs across the if_no_eligible/update_state pair in step.
+        self._eligible_cache = None
+        self._eligible_dirty = True
+
         self.init_state()
-        
+
         self.backup4reset()
+
+        # Close the device context now that all init-time allocations are done.
+        self._init_dev_ctx.__exit__(None, None, None)
+        self._init_dev_ctx = None
     
     
     def backup4reset(self):
@@ -282,8 +300,11 @@ class IPPSEnv:
     
     def update_graph(self, actions):
         self.graph.update_features(self.batch_idxes, actions, self.schedules_batch[:,:,3], self.ready_time, self.time,
-                                self.machines_batch, self.ope_req_num_batch, self.combs_time_batch, 
-                                (~self.mask_job_finish_batch).unsqueeze(-1)*self.combs_id_batch, self.remain_opes_batch, self.job_estimate_end_batch)
+                                self.machines_batch, self.ope_req_num_batch, self.combs_time_batch,
+                                (~self.mask_job_finish_batch).unsqueeze(-1)*self.combs_id_batch, self.remain_opes_batch, self.job_estimate_end_batch,
+                                opes_dirty=self._remain_opes_dirty, combs_dirty=self._combs_id_dirty)
+        self._remain_opes_dirty = False
+        self._combs_id_dirty = False
 
     def init_state(self):
         '''
@@ -325,6 +346,10 @@ class IPPSEnv:
         opes = actions[0, :]
         mas = actions[1, :]
         jobs = actions[2, :]
+        dev = self.device
+
+        # step mutates masks/adj/etc; invalidate the eligible-pair cache up front.
+        self._eligible_dirty = True
 
         self.N += 1
 
@@ -345,13 +370,16 @@ class IPPSEnv:
             if other_or_opes.numel():
                 comb_ids = torch.where(self.combs_id_batch[act_batch_idx, jobs[i]] == 1)[0]
                 discard = torch.tensor([1 if tensor.numel() else 0 for tensor in [torch.where(combination[other_or_opes] == 1)[0]
-                                                                                for combination in self.combs_batch[act_batch_idx, comb_ids]]])
+                                                                                for combination in self.combs_batch[act_batch_idx, comb_ids]]], device=dev)
                 self.combs_id_batch[act_batch_idx, jobs[i], comb_ids] -= discard
                 job_start_ope = self.num_ope_biases_batch[act_batch_idx, jobs[i]]
                 job_end_ope = self.end_ope_biases_batch[act_batch_idx, jobs[i]]
                 opes_on_remain_combs = torch.matmul(self.combs_id_batch[act_batch_idx, jobs[i], comb_ids].unsqueeze(0),
                                                     self.combs_batch[act_batch_idx, comb_ids]).squeeze().bool()
                 self.remain_opes_batch[act_batch_idx, job_start_ope:job_end_ope + 1] *= opes_on_remain_combs[job_start_ope:job_end_ope + 1]
+                # remain_opes/combs_id mutated; mark the graph edge-subgraph dirty.
+                self._remain_opes_dirty = True
+                self._combs_id_dirty = True
                 if torch.where(self.combs_id_batch[act_batch_idx, jobs[i]] == 1)[0].numel() == 0:
                     raise ValueError("No available combinations")
             
@@ -375,28 +403,28 @@ class IPPSEnv:
             raise ValueError("The number of required operations is less than 0")
           
         self.next_ope_eligible_batch[active_idxes] = self.next_ope_eligible_batch[active_idxes] + \
-            torch.where(self.ope_req_num_batch[active_idxes]==0, opes_add_matrix, torch.tensor(0, dtype=torch.int32)) - \
+            torch.where(self.ope_req_num_batch[active_idxes]==0, opes_add_matrix, torch.tensor(0, dtype=torch.int32, device=dev)) - \
             (opes_matrix[active_idxes].unsqueeze(-2).float().matmul(self.ope_or_batch[active_idxes].float())).int().squeeze(-2)
 
 
         # Removed unselected O-M arcs of the scheduled operations
-        remain_ope_ma_adj = torch.zeros(size=(self.batch_size, self.num_mas), dtype=torch.int64)
+        remain_ope_ma_adj = torch.zeros(size=(self.batch_size, self.num_mas), dtype=torch.int64, device=dev)
         remain_ope_ma_adj[active_idxes, mas] = 1
         self.ope_ma_adj_batch[active_idxes, opes] = remain_ope_ma_adj[active_idxes, :]
         self.proc_times_batch *= self.ope_ma_adj_batch
 
 
         # Update for some O-M arcs are removed, such as 'Status', 'Number of neighboring machines' and 'Processing time'
-        self.info_ope_status_batch[active_idxes, opes] = torch.ones(active_idxes.size(0), dtype=torch.float)
+        self.info_ope_status_batch[active_idxes, opes] = torch.ones(active_idxes.size(0), dtype=torch.float, device=dev)
         self.info_ope_proc_time_batch[active_idxes, opes] = proc_times
 
         self.info_ope_scheduled_start_batch[active_idxes, opes] = self.time[active_idxes]
 
-        self.schedules_batch[active_idxes, opes, :2] = torch.stack((torch.ones(active_idxes.size(0)), mas), dim=1)
+        self.schedules_batch[active_idxes, opes, :2] = torch.stack((torch.ones(active_idxes.size(0), device=dev), mas), dim=1)
         self.schedules_batch[active_idxes, opes, 2] = self.info_ope_scheduled_start_batch[active_idxes, opes]
         self.schedules_batch[active_idxes, opes, 3] = self.info_ope_scheduled_start_batch[active_idxes, opes] + \
                                                        self.info_ope_proc_time_batch[active_idxes, opes]
-        self.machines_batch[active_idxes, mas, 0] = torch.zeros(active_idxes.size(0))
+        self.machines_batch[active_idxes, mas, 0] = torch.zeros(active_idxes.size(0), device=dev)
         self.machines_batch[active_idxes, mas, 1] = self.time[active_idxes] + proc_times
         self.machines_batch[active_idxes, mas, 2] += proc_times
         self.machines_batch[active_idxes, mas, 3] = jobs.float()
@@ -413,14 +441,14 @@ class IPPSEnv:
         self.mask_job_procing_batch[active_idxes, jobs] = torch.where(proc_times > 1e-3, True, False)
         self.mask_ma_procing_batch[active_idxes, mas] = torch.where(proc_times > 1e-3, True, False)
 
-        lag_mask_job_finish_batch = copy.deepcopy(self.mask_job_finish_batch)
+        lag_mask_job_finish_batch = self.mask_job_finish_batch.clone()
         self.mask_job_finish_batch = torch.where(self.ope_step_batch == self.end_ope_biases_batch, True, self.mask_job_finish_batch)
         
         self.done_batch = self.mask_job_finish_batch.all(dim=1)
         self.done = self.done_batch.all()
 
         # get reward
-        bonus = torch.zeros(len(active_idxes))
+        bonus = torch.zeros(len(active_idxes), device=dev)
         if self.reward_info['balance_bonus']:
             bonus = torch.where(self.job_estimate_end_batch[active_idxes, jobs] >= 0.8 * torch.max(self.job_estimate_end_batch[active_idxes] * ~lag_mask_job_finish_batch[active_idxes], dim=1)[0],
                                 self.ave_proc_time / 10, - self.ave_proc_time / (10 * self.num_jobs)) * proc_times.bool()
@@ -441,7 +469,7 @@ class IPPSEnv:
         
 
         # Check if there are still O-M pairs to be processed, otherwise the environment transits to the next time
-        wait_idxes_onehot = torch.zeros(self.batch_size, dtype=torch.float)
+        wait_idxes_onehot = torch.zeros(self.batch_size, dtype=torch.float, device=dev)
         wait_idxes_onehot[batch_idxes] = 1
         wait_idxes_onehot[active_idxes] = 0
         
@@ -461,7 +489,7 @@ class IPPSEnv:
         mask_finish = self.done_batch
         mask_batch_idxes = mask_finish[batch_idxes]
         if mask_finish.any():
-            self.batch_idxes = torch.arange(self.batch_size)[~mask_finish]
+            self.batch_idxes = torch.arange(self.batch_size, device=dev)[~mask_finish]
             
         if not self.done_batch.all():
             if not self.is_greedy:
@@ -488,7 +516,7 @@ class IPPSEnv:
                                                                 self.mask_job_finish_batch[batch_idxes]),
                                                 job_last_ope_end_time_batch,
                                                 time[batch_idxes].unsqueeze(1))
-        proc_time_batch = torch.zeros(size = (batch_size, self.num_opes)).scatter(1, job_last_ope_batch, job_last_ope_end_time_batch) + \
+        proc_time_batch = torch.zeros(size = (batch_size, self.num_opes), device=self.device).scatter(1, job_last_ope_batch, job_last_ope_end_time_batch) + \
             (1 - self.info_ope_status_batch[batch_idxes]) * self.info_ope_proc_time_batch[batch_idxes]
         
         if wait_idxes.numel() > 0:
@@ -523,18 +551,29 @@ class IPPSEnv:
         return makespan_batch
 
     def find_eligible_pairs(self, find_future = False):
+        # Re-use the most recent computation when no state has been mutated since.
+        # Within step() this saves 1–2 full recomputations (if_no_eligible -> update_state).
+        # batch_idxes can shrink mid-step (when batches complete), so verify shape match
+        # before reusing — `.size(0)` is a Python int and does not sync.
+        if not self._eligible_dirty and self._eligible_cache is not None:
+            e, fe = self._eligible_cache
+            if e.size(0) == self.batch_idxes.size(0):
+                return (e, fe) if find_future else e
+
         batch_idxes = self.batch_idxes
+        # Cache the slice so we index once rather than three times.
         eligible_proc = self.ope_ma_adj_batch[batch_idxes]
-        
-        ma_eligible = ~self.mask_ma_procing_batch[self.batch_idxes].unsqueeze(1).expand_as(self.ope_ma_adj_batch[self.batch_idxes])
-        job_ope_eligible = self.find_job_ope_eligible().unsqueeze(-1).expand_as(self.ope_ma_adj_batch[self.batch_idxes]).bool() 
-        opes_eligible = self.find_next_ope_eligible().unsqueeze(-1).expand_as(self.ope_ma_adj_batch[self.batch_idxes])
-        
+        ma_eligible = ~self.mask_ma_procing_batch[batch_idxes].unsqueeze(1).expand_as(eligible_proc)
+        job_ope_eligible = self.find_job_ope_eligible().unsqueeze(-1).expand_as(eligible_proc).bool()
+        opes_eligible = self.find_next_ope_eligible().unsqueeze(-1).expand_as(eligible_proc)
+
         ope_proc_eligible = opes_eligible & (eligible_proc == 1)
-        if not find_future:
-            return ma_eligible & ope_proc_eligible & job_ope_eligible
-        else:
-            return ma_eligible & ope_proc_eligible & job_ope_eligible, ope_proc_eligible & (~ma_eligible | ~job_ope_eligible)
+        eligible = ma_eligible & ope_proc_eligible & job_ope_eligible
+        future_eligible = ope_proc_eligible & (~ma_eligible | ~job_ope_eligible)
+
+        self._eligible_cache = (eligible, future_eligible)
+        self._eligible_dirty = False
+        return (eligible, future_eligible) if find_future else eligible
         
     def find_job_ope_eligible(self):
         job_eligible = ~(self.mask_job_procing_batch[self.batch_idxes] + self.mask_job_finish_batch[self.batch_idxes])
@@ -550,7 +589,7 @@ class IPPSEnv:
         '''
         batch_idxes = self.batch_idxes
         eligible_pairs = self.find_eligible_pairs()
-        flag_trans_2_next_time = torch.full(size=(self.batch_size,), fill_value=0, dtype=torch.float)
+        flag_trans_2_next_time = torch.full(size=(self.batch_size,), fill_value=0, dtype=torch.float, device=self.device)
         flag_trans_2_next_time[batch_idxes] = torch.sum(eligible_pairs.transpose(1, 2), dim=[1, 2]).float()
         return flag_trans_2_next_time
     
@@ -586,9 +625,10 @@ class IPPSEnv:
         if not torch.any(flag_need_trans):
             return
         trans_idxes = torch.where((flag_need_trans == 1))[0]
-        # Calculate the minimum available time of each batch
-        machine_greater_than_current = torch.where(ma_jump, machine_avail_time, torch.tensor(float('inf')).to(machine_avail_time.device))
-        job_greater_than_current = torch.where(job_jump, job_avail_time, torch.tensor(float('inf')).to(job_avail_time.device))
+        # Calculate the minimum available time of each batch. torch.where with a Python
+        # float operand (float('inf')) avoids the per-call torch.tensor allocation.
+        machine_greater_than_current = torch.where(ma_jump, machine_avail_time, float('inf'))
+        job_greater_than_current = torch.where(job_jump, job_avail_time, float('inf'))
         
         # Find the minimum value of available_time
         min_machine_time = torch.min(machine_greater_than_current, dim=1, keepdim=True)[0]  # shape: (batch_size, 1)
@@ -603,6 +643,9 @@ class IPPSEnv:
         self.time[trans_idxes] = min_avail_time.squeeze(-1)[trans_idxes]
         self.remain_opes_batch[trans_idxes] *= torch.logical_or(self.schedules_batch[trans_idxes, :, 3] > self.time[trans_idxes].unsqueeze(1),
                                                                  1 - self.info_ope_status_batch[trans_idxes])
+        # next_time touches remain_opes and masks; refresh graph subgraph and invalidate eligibility cache.
+        self._remain_opes_dirty = True
+        self._eligible_dirty = True
 
         # Update partial schedule (state), variables and infoure vectors
         aa = self.machines_batch.transpose(1, 2)
@@ -615,7 +658,8 @@ class IPPSEnv:
         utiliz = utiliz.div(self.time[:, None] + 1e-5)
 
         jobs = torch.where(d, self.machines_batch[:, :, 3].double(), -1.0).float()
-        jobs_index = np.argwhere(jobs.cpu() >= 0).to(self.device)
+        # torch.argwhere keeps the work on GPU; the previous np.argwhere(jobs.cpu()) forced a sync every step.
+        jobs_index = torch.argwhere(jobs >= 0).t()
         job_idxes = jobs[jobs_index[0], jobs_index[1]].long()
         batch_idxes = jobs_index[0]
 
@@ -628,6 +672,10 @@ class IPPSEnv:
         '''
         Reset the environment to its initial state
         '''
+        # Same trick as __init__: scope a default device for the bulk of reset's
+        # tensor allocations so we don't have to thread device= through each one.
+        _reset_ctx = torch.device(self.device)
+        _reset_ctx.__enter__()
         self.num_opes = self.ori_num_opes
         self.num_jobs = self.ori_num_jobs
         self.num_mas = self.ori_num_mas
@@ -678,6 +726,15 @@ class IPPSEnv:
         self.makespan_batch = self.get_estimate_end_time(self.mask_job_finish_batch)
         self.done_batch = self.mask_job_finish_batch.all(dim=1)
 
+        # Graph was deep-copied from old_graph which reflected the initial state;
+        # mark dirty so the first step after reset still gets a correct subgraph if
+        # anything mutates.
+        self._remain_opes_dirty = True
+        self._combs_id_dirty = True
+        self._eligible_dirty = True
+        self._eligible_cache = None
+
+        _reset_ctx.__exit__(None, None, None)
         return self.state
     
     def proc_time_change(self, lag_mask_job_finish_batch, actions, ratio_range = 0.9):

@@ -326,7 +326,7 @@ def flatten_padded_tensor(ptr:torch.Tensor, padded_tensor):
         torch.Tensor: A 1D tensor containing the flattened sequences.
     """
     length = (ptr[1:] - ptr[:-1]).unsqueeze(-1).expand_as(padded_tensor)
-    mask = (torch.arange(padded_tensor.size(1)).expand_as(padded_tensor) < length).flatten()
+    mask = (torch.arange(padded_tensor.size(1), device=padded_tensor.device).expand_as(padded_tensor) < length).flatten()
     return padded_tensor.flatten()[mask]
     
     

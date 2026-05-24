@@ -81,8 +81,11 @@ class PPO:
         old_actives = torch.stack(memory.actives, dim=0).transpose(0, 1).flatten(0, 1)
         old_actives_no_flat = torch.stack(memory.actives, dim=0).transpose(0, 1)
 
-        # Deal with Graph
-        memory_graphs = list(itertools.chain(*zip(*memory.graphs)))
+        # Deal with Graph: memory.graphs now stores cloned Batch objects (one per step).
+        # Expand each to a per-instance list here (the heavy `to_data_list` cost stays
+        # out of the hot act() loop and runs once per update batch).
+        per_step_lists = [b.to_data_list() for b in memory.graphs]
+        memory_graphs = list(itertools.chain(*zip(*per_step_lists)))
         selected_graphs = [memory_graphs[i] for i in old_actives.nonzero(as_tuple=True)[0]]
 
         # Ensure all tensors are float
@@ -104,8 +107,8 @@ class PPO:
         for i in range(self.num_envs):
             rewards = []
             discounted_reward = 0
-            active_rewards = memory_rewards[i][old_actives_no_flat[i]].squeeze()  # 仅选取有效的奖励
-            active_terminals = memory_is_terminals[i][old_actives_no_flat[i]].squeeze()  # 仅选取有效的终止标志
+            active_rewards = memory_rewards[i][old_actives_no_flat[i]].squeeze()
+            active_terminals = memory_is_terminals[i][old_actives_no_flat[i]].squeeze()
             for reward, is_terminal in zip(reversed(active_rewards), reversed(active_terminals)):
                 if is_terminal:
                     discounted_rewards += discounted_reward
@@ -140,14 +143,14 @@ class PPO:
                 if start_idx >= end_idx - 1:
                     continue
                 
-                batch_idxes = torch.arange(start_idx, end_idx).long().to(device)
+                batch_idxes = torch.arange(start_idx, end_idx, device=device).long()
                 logprobs, state_values, dist_entropy = self.policy.evaluate(
                     graph = Graph_Batch(selected_graphs[start_idx:end_idx]),
-                    eligible = old_eligible[batch_idxes], 
+                    eligible = old_eligible[batch_idxes],
                     future_eligible=old_future_eligible[batch_idxes],
                     opes_appertain=old_opes_appertain[batch_idxes],
-                    actions = old_action_envs[batch_idxes], 
-                    batch_idxes = torch.arange(batch_idxes.size(0)).long(),
+                    actions = old_action_envs[batch_idxes],
+                    batch_idxes = torch.arange(batch_idxes.size(0), device=device).long(),
                     waits = old_waits[batch_idxes]
                 )
 

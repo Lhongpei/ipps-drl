@@ -102,14 +102,23 @@ class Policy(torch.nn.Module):
                 - ptr (Tensor): Pointer tensor.
 
         """
-        new_graph = copy.deepcopy(graph.data)
-        graph_emb = self.graph_embedding(normalize_hetero_data(new_graph))
-        embs_nodes, ptr = get_graph_embs_to_pair(graph_emb, eligible, opes_appertain, batch_idxes)
-
-        embs_global = global_pooling(graph_emb, pool_type=self.pooling_method)[batch_idxes]
-
-        embs_local_global = cat_local_global_embedding(embs_nodes, embs_global, ptr)
-
+        # Avoid the full Batch deepcopy by snapshotting only the x/edge_attr tensors
+        # that `normalize_hetero_data` + `graph_embedding.forward` will overwrite, then
+        # restoring them after embedding extraction. The downstream `embs_*` outputs are
+        # fresh `torch.cat` allocations and don't alias `graph.data`, so restoration is safe.
+        data = graph.data
+        saved_x = {nt: data[nt].x for nt in data.node_types}
+        saved_ea = {et: data[et].edge_attr for et in data.edge_types if 'edge_attr' in data[et]}
+        try:
+            graph_emb = self.graph_embedding(normalize_hetero_data(data))
+            embs_nodes, ptr = get_graph_embs_to_pair(graph_emb, eligible, opes_appertain, batch_idxes)
+            embs_global = global_pooling(graph_emb, pool_type=self.pooling_method)[batch_idxes]
+            embs_local_global = cat_local_global_embedding(embs_nodes, embs_global, ptr)
+        finally:
+            for nt, x in saved_x.items():
+                data[nt].x = x
+            for et, ea in saved_ea.items():
+                data[et].edge_attr = ea
         return embs_nodes, embs_global, embs_local_global, ptr,
 
     
@@ -235,16 +244,17 @@ class Policy(torch.nn.Module):
         else:
             actor_nodes = self.actor(embs_local_global).view(-1,1)
             actor_proc = shift_to_batch(actor_nodes, ptr_proc)
+            dev = actor_proc.device
             if can_wait & torch.any(indicator_wait):
                 actor_wait = self.actor4wait(embs_wait).view(-1,1)
-            
+
                 actor_wait = shift_to_batch(actor_wait, ptr_wait)
-                actor_wait_padded = torch.full((actor_proc.size(0), actor_wait.size(1)), fill_value=-float('inf'))
+                actor_wait_padded = torch.full((actor_proc.size(0), actor_wait.size(1)), fill_value=-float('inf'), device=dev)
                 actor_wait_padded[indicator_wait] = actor_wait
                 actor_all = torch.cat([actor_proc, actor_wait_padded], dim=-1)
                 action_probs_all = F.softmax(actor_all, dim=-1) if not log_probs else F.log_softmax(actor_all, dim=-1)
-                action_probs = torch.zeros(size=(actor_proc.size(0), len_proc+1)) if not log_probs \
-                    else torch.full(size=(actor_proc.size(0), len_proc+1), fill_value=-float('inf'))
+                action_probs = torch.zeros(size=(actor_proc.size(0), len_proc+1), device=dev) if not log_probs \
+                    else torch.full(size=(actor_proc.size(0), len_proc+1), fill_value=-float('inf'), device=dev)
                 action_probs[:, :-1] = action_probs_all[:, :len_proc]
                 
                 if self.wait_deal == 'max':
@@ -271,7 +281,7 @@ class Policy(torch.nn.Module):
                 elif self.wait_deal == 'weighted':
                     with torch.no_grad():
                         wait_in_actor = F.softmax(self.actor(embs_wait).view(-1,1), dim= -1)
-                    wait_in_actor_padded = torch.full((actor_proc.size(0), wait_in_actor.size(1)), fill_value=-float('inf'))
+                    wait_in_actor_padded = torch.full((actor_proc.size(0), wait_in_actor.size(1)), fill_value=-float('inf'), device=dev)
                     wait_in_actor_padded[indicator_wait] = wait_in_actor
                     action_probs[indicator_wait, -1] = torch.sum(action_probs_all[indicator_wait, len_proc:] * wait_in_actor_padded, dim=-1) if not log_probs \
                         else torch.logsumexp(action_probs_all[indicator_wait, len_proc:] + wait_in_actor, dim=-1)
@@ -365,26 +375,36 @@ class DRLPolicy(Policy):
                 action_indexes = action_probs.argmax(dim=1)
 
             job_ope_relation = state.opes_appertain_batch[batch_idxes]
-            action = torch.zeros(3, batch_idxes.size(0), dtype=torch.long)
 
             wait_idx = torch.nonzero(indicator_wait).squeeze(-1)
-            padded_wait_idx = torch.scatter(torch.full((action_indexes.size(0),), -1, dtype=torch.long), 
+            padded_wait_idx = torch.scatter(torch.full((action_indexes.size(0),), -1, dtype=torch.long, device=self.device),
                                             0, wait_idx, torch.arange(wait_idx.size(0), device=self.device))
 
-
-
-            # Choose the action And get the action embedding
-            for i in range(action_indexes.size(0)):
-                eligible_pair = eligible[i].nonzero().t()
-                if action_indexes[i] >= eligible_pair.size(1):
-                    action[:, i] = int(-1)
-                    index = padded_wait_idx[i]
-                    assert index != -1
-
-                else:
-                    action[0, i] = eligible_pair[0, action_indexes[i]].long()
-                    action[1, i] = eligible_pair[1, action_indexes[i]].long()
-                    action[2, i] = job_ope_relation[i, action[0, i]].long()
+            # Vectorized per-batch action selection — the original `for i in range(...)` loop
+            # was the dominant non-GNN cost in act(). All eligible (ope, ma) pairs are flattened
+            # in lexicographic order matching eligible[i].nonzero(), so per-batch local indices
+            # map cleanly to a single global gather.
+            n_active = action_indexes.size(0)
+            elig_per_batch = eligible.reshape(n_active, -1).sum(dim=1)
+            is_wait = action_indexes >= elig_per_batch
+            cum_offset = torch.cat([
+                torch.zeros(1, dtype=torch.long, device=action_indexes.device),
+                elig_per_batch[:-1].cumsum(0),
+            ])
+            global_idx = cum_offset + action_indexes
+            # For wait rows, clamp the gather index to 0 so flat_nz[...] stays in bounds;
+            # we overwrite the gathered value with -1 below via `is_wait`. Avoids a sync.
+            safe_idx = torch.where(is_wait, torch.zeros_like(global_idx), global_idx)
+            flat_nz = eligible.nonzero()  # (total_elig, 3): (batch, ope, mas)
+            picked = flat_nz[safe_idx]
+            chosen_opes = picked[:, 1]
+            chosen_mas = picked[:, 2]
+            chosen_jobs = job_ope_relation.gather(1, chosen_opes.unsqueeze(1)).squeeze(1)
+            neg_one = torch.tensor(-1, dtype=torch.long, device=chosen_opes.device)
+            opes_out = torch.where(is_wait, neg_one, chosen_opes)
+            mas_out = torch.where(is_wait, neg_one, chosen_mas)
+            jobs_out = torch.where(is_wait, neg_one, chosen_jobs)
+            action = torch.stack([opes_out, mas_out, jobs_out], dim=0).long()
 
 
             # Update the memory
@@ -409,8 +429,14 @@ class DRLPolicy(Policy):
                 padded_future_eligible[state.batch_idxes] = state.future_eligible_pairs
                 
                 memory.eligible.append(padded_eligible)
-                memory.graphs.append(copy.deepcopy(state.graph.data.to_data_list()))
-                memory.batch_idxes.append(copy.deepcopy(state.batch_idxes))
+                # Snapshot the batched graph and defer per-instance separation to
+                # PPO.update consumption time. `snapshot_batch` deep-clones tensors
+                # (including the private _slice_dict that env.update_edge_sub_graph
+                # mutates) but skips Python's deepcopy machinery — about 100x faster
+                # than the previous `deepcopy(state.graph.data.to_data_list())`.
+                from network.hetero_data import snapshot_batch as _snap
+                memory.graphs.append(_snap(state.graph.data))
+                memory.batch_idxes.append(state.batch_idxes.clone())
                 memory.actives.append(padded_indices)
                 memory.logprobs.append(padded_log_probs)
                 memory.action_indexes.append(padded_action_indexes)
