@@ -19,7 +19,6 @@ def SPT_pairs(state:EnvState, device):
     # Get the processing time of each operation
     proc_time = torch.where(eligible, state.proc_times_batch, torch.ones_like(state.proc_times_batch) * float('inf'))
     # Choose a machine with the shortest processing time
-    # 将flat索引转换回原始的操作和机器索引
     indices = proc_time.view(proc_time.size(0),-1).argmin(dim=1)
     num_mas = proc_time.size(2)
     operations_indices = indices // num_mas

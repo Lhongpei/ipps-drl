@@ -34,7 +34,6 @@ vector<string> readLinesFromFile(const string &filePath)
     vector<string> lines;
     string line;
 
-    // 逐行读取
     while (getline(infile, line))
     {
         lines.push_back(line);

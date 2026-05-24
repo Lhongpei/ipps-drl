@@ -35,10 +35,8 @@ public:
     void init_estimate_makespan();
     void update_estimate_makespan(int job, bool has_comb_change = false);
     Env(std::vector<std::string> &lines, bool estimate_by_comb = true);
-    // 拷贝构造函数
     Env(const Env &other);
 
-    // 拷贝赋值运算符
     Env &operator=(const Env &other);
     void step(int ope, int mas);
     // Batched step: applies a sequence of (ope, ma) actions in order. Mirrors the

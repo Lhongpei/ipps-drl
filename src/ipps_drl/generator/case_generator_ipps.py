@@ -27,7 +27,6 @@ class CaseGenerator:
                 new_job=jobs_generator(machine_range=(self.machine_num,self.machine_num),mas_p=mas_p,or_p=or_p,ope=ope,ope_num=ope_num, ope_range=ope_range,total_ope_range=total_ope_range,time_range=time_range,max_out=max_out,road_num=road_num, ope_num_orpath=ope_num_orpath,and_road_num=and_road_num,ope_num_andpath=ope_num_andpath,and_p=and_p,path=f'./train_tmp/graph',save=True)
                 job_list.append(new_job)
                 
-            # 列出文件夹中的所有文件并按索引选择
 
             job_pool = list(range(len(job_list)))
             input_jobs = random.sample(job_pool, self.job_num)
@@ -43,42 +42,35 @@ class CaseGenerator:
 
                 lines = job_list[job_index]
 
-                # 找到out部分的开始和结束
                 out_start_index = lines.index("out") + 1
                 out_end_index = lines.index("in", out_start_index)
 
-                # 处理out部分的每一行
                 for line in lines[out_start_index:out_end_index]:
                     if line.strip():  
                         new_line = offset_line(line, current_offset)
                         combined_out.append(new_line)
 
-                # 找到in部分的开始和结束
                 in_start_index = lines.index("in") + 1
                 in_end_index = lines.index("info", in_start_index)
 
-                # 处理in部分的每一行
                 for line in lines[in_start_index:in_end_index]:
                     if line.strip(): 
                         new_line = offset_line(line, current_offset)
                         combined_in.append(new_line)
 
-                # 找到info部分的开始
                 info_start_index = lines.index("info") + 1
 
-                # 处理info部分的每一行
                 for line in lines[info_start_index:]:
                     if line.strip(): 
                         parts = line.split()
                         parts[0] = str(int(parts[0]) + current_offset)
                         updated_info_lines.append(' '.join(parts))
-                        machines_used = parts[2::2]  # 每隔两个元素获取机器编号
+                        machines_used = parts[2::2]
                         all_machines_used.update(map(int, machines_used))
 
-                # 更新偏移量
                 current_offset += int(lines[0].split()[2])
 
-            # 如果机器数量不等于 machine_num，则重新选择作业
+            # Re-roll the job selection if it does not use exactly `machine_num` machines.
             if all_machines_used != set(range(1, self.machine_num + 1)):
                 continue
 
@@ -109,23 +101,17 @@ class CaseGenerator:
 
         while True:
 
-            # 列出文件夹中的所有文件并按索引选择
             index=[]
             job_files = [f for f in os.listdir(job_folder) if f.endswith('.txt') and f"mas_{self.machine_num}" in f]
             
-            # 确保文件按升序排列
             job_files.sort()
             
-            # 获取文件数量范围
             job_pool = list(range(len(job_files)))
             
-            # 随机选择 job_num 个文件
             input_jobs = random.sample(job_pool, self.job_num)
             
-            # 按升序排序
             input_jobs = sorted(input_jobs)
             
-            # 返回选择的文件名列表
             
             current_offset = 0
             combined_out = []
@@ -140,42 +126,35 @@ class CaseGenerator:
                 with open(os.path.join(job_folder, job_file), 'r') as file:
                     lines = file.readlines()
 
-                    # 找到out部分的开始和结束
                     out_start_index = lines.index("out\n") + 1
                     out_end_index = lines.index("in\n", out_start_index)
 
-                    # 处理out部分的每一行
                     for line in lines[out_start_index:out_end_index]:
                         if line.strip():  
                             new_line = offset_line(line, current_offset)
                             combined_out.append(new_line)
 
-                    # 找到in部分的开始和结束
                     in_start_index = lines.index("in\n") + 1
                     in_end_index = lines.index("info\n", in_start_index)
 
-                    # 处理in部分的每一行
                     for line in lines[in_start_index:in_end_index]:
                         if line.strip(): 
                             new_line = offset_line(line, current_offset)
                             combined_in.append(new_line)
 
-                    # 找到info部分的开始
                     info_start_index = lines.index("info\n") + 1
 
-                    # 处理info部分的每一行
                     for line in lines[info_start_index:]:
                         if line.strip(): 
                             parts = line.split()
                             parts[0] = str(int(parts[0]) + current_offset)
                             updated_info_lines.append(' '.join(parts))
-                            machines_used = parts[2::2]  # 每隔两个元素获取机器编号
+                            machines_used = parts[2::2]
                             all_machines_used.update(map(int, machines_used))
 
-                    # 更新偏移量
                     current_offset += int(lines[0].split()[2])
 
-            # 如果机器数量不等于 machine_num，则重新选择作业
+            # Re-roll the job selection if it does not use exactly `machine_num` machines.
             if all_machines_used != set(range(1, self.machine_num + 1)):
                 continue
 

@@ -1,7 +1,7 @@
 import torch
 from ipps_drl.utils.utils import getAncestors, parse_data, getAdjacent
 from ipps_drl.utils.get_possible_set import comb_matrix_core,find_or_dict
-#假设数据从一个名为"graph_data.txt"的文件中读取
+# Default test fixture path.
 file_path = 'kim_dataset/problem/problem1.txt'
 
 
@@ -89,7 +89,6 @@ def generate_matrices(lines, given_num_mas=None):
     or_dict,or_direct=find_or_dict(num_opes,matrix_cal_cumul,or_edge)
     matrix_combs_id, matrix_combs = comb_matrix_core(matrix_pre_proc, or_edge, in_lines, num_jobs, num_opes,or_dict,or_direct)
 
-    # 计算入度并调整特定节点
     ope_req_num = matrix_pre_proc.sum(0).t()
     remain_opes = torch.ones(num_opes, dtype=int)
     for line in in_lines:
@@ -100,7 +99,6 @@ def generate_matrices(lines, given_num_mas=None):
                 targets = map(int, parts[i].strip('()').split(','))
                 ope_req_num[node] -= (len(list(targets)) - 1)
 
-    # 处理机器分配和处理时间
     job = -1
     for line in info_lines:
         parts = line.split()
@@ -135,7 +133,6 @@ def generate_matrices(lines, given_num_mas=None):
 
     matrix_cal_cumul=getAncestors(matrix_pre_proc)
 
-    # 考虑到当前节点，进行初始化更新
     for ope_id in num_ope_biases:
         ope_eligible[ope_id] = 1
     remain_opes[num_ope_biases] = 0
@@ -164,7 +161,6 @@ def nums_detec(lines):
     :param lines: List of strings, each string is a line of input data representing job-shop scheduling information
     :return: Tuple of (num_jobs, num_machines, num_opes)
     '''
-    # 从第一行提取作业数和机器数
     num_jobs, num_machines, num_opes = map(int, lines[0].split())
 
     return num_jobs, num_machines, num_opes

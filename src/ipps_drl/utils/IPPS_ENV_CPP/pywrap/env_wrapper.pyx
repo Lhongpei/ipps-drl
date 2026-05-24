@@ -16,10 +16,9 @@ cdef extern from "io.h":
 
 cdef extern from "env.h":
     cdef cppclass Env:
-        Env(const Env&)  # 拷贝构造函数
-        Env& operator=(const Env&)  # 拷贝赋值运算符
+        Env(const Env&)
+        Env& operator=(const Env&)
 
-        # 其他方法声明
         Env(const vector[cpp_string]& lines, bint estimate_by_comb) except +
         void step(int ope, int mas)
         void steps(const vector[pair[int, int]] &actions)
@@ -32,35 +31,21 @@ cdef extern from "env.h":
         void printDebugInfo() const
 
 cdef extern from "greedy.h":
-
-
-
-    # DispatchRule 类定义
     cdef cppclass DispatchRule:
-        # 构造函数,带有默认参数
         DispatchRule(int ope_rule_type, int ma_rule_type, bint pairSPT, bint minComb, bint randomChoiceOpt) except +
-
         void setTypes(int ope_rule_type, int ma_rule_type)
+        pair[int, int] dispatchPairSPT(Env& env, double time, bint canwait)
+        pair[int, int] dispatchStep(Env& env, double time, bint canwait)
 
-        pair[int, int] dispatchPairSPT(Env& env, double time,bint canwait)
-
-        pair[int, int] dispatchStep(Env& env, double time,bint canwait)
 cdef extern from "state.h":
     cdef cppclass State:
-        # Constructors
         State(OpeJobProc ope_job_scheduler, OpeMasProc ope_ma_scheduler) except +
-        State(const State &other) except +   # Copy constructor
-        State &operator=(const State &other) except +  # Assignment operator
-        
-        # Member functions
+        State(const State &other) except +
+        State &operator=(const State &other) except +
         double findNextTime(double time, bint larger_than_time)
-        
-        # Public members
         OpeJobProc ope_job_scheduler
         OpeMasProc ope_ma_scheduler
 
-# Create a wrapper class in Python for State
-# Import externs from C++ header
 cdef extern from "graph.h":
     cdef cppclass OpeJobProc:
         OpeJobProc(int num_opes, int num_jobs) except +
@@ -75,7 +60,6 @@ cdef extern from "graph.h":
         void scheduleMa(int mas, double time, double proc_time) except +
         double getFinishTime(int mas) except +
 
-# Python wrappers for OpeJobProc and OpeMasProc
 
 cdef class PyOpeJobProc:
     cdef OpeJobProc* thisptr
@@ -100,14 +84,6 @@ cdef class PyOpeJobProc:
     def __dealloc__(self):
         del self.thisptr
 
-cdef extern from "graph.h":
-    cdef cppclass OpeMasProc:
-        OpeMasProc(int num_opes, int num_mas) except +
-        double getProcTime(int ope, int mas) except +
-        void scheduleMa(int mas, double time, double proc_time) except +
-        double getFinishTime(int mas) except +
-
-# Python wrapper class for OpeMasProc
 cdef class PyOpeMasProc:
     cdef OpeMasProc* thisptr
 
@@ -159,43 +135,22 @@ cdef class PyEnv:
 ], bint is_eval=True):
         cdef vector[cpp_string] cpp_lines
         cdef bytes py_bytes
-        print("hello")
-        if lines is not None:
-            for line in lines:
-                print(line)
-                if isinstance(line, str):
-                    py_bytes = line.encode('utf-8')
-                    cpp_lines.push_back(cpp_string(<char*>py_bytes))
-                else:
-                    raise TypeError("Lines must be strings")
-            print("ono")
+        if lines is None:
             self.thisptr = new Env(cpp_lines, is_eval)
-            print("isdone")
-        
-        else:
-            self.thisptr =  new Env(lines, is_eval)# 空指针
-
+            return
+        for line in lines:
+            if not isinstance(line, str):
+                raise TypeError("Lines must be strings")
+            py_bytes = line.encode('utf-8')
+            cpp_lines.push_back(cpp_string(<char*>py_bytes))
+        self.thisptr = new Env(cpp_lines, is_eval)
 
     def copy(self):
-        """
-        调用 C++ 拷贝构造函数生成新的 PyEnv 对象
-        """
-        print("Copying PyEnv object...")
-
+        """Return a new PyEnv that wraps a deep copy of the underlying C++ Env."""
         if not self.thisptr:
             raise ValueError("Attempting to copy an uninitialized PyEnv object")
-
-
-
-
-        print("Calling C++ copy constructor...")
-        
-        cdef PyEnv new_env  = PyEnv( )
-        print("its still fine")
-
-        new_env.thisptr = new Env(self.thisptr[0]) 
-
-        print("Copy successful.")
+        cdef PyEnv new_env = PyEnv()
+        new_env.thisptr = new Env(self.thisptr[0])
         return new_env
     def step(self, int ope, int mas):
         self.thisptr.step(ope, mas)
@@ -233,16 +188,13 @@ cdef class PyEnv:
     def reset(self):
         self.thisptr.reset()
     def printDebugInfo(self):
-        """
-        Print debug information of the Env object.
-        """
+        """Print debug information of the underlying C++ Env."""
         if self.thisptr:
             self.thisptr.printDebugInfo()
         else:
             print("PyEnv object is not initialized.")
 
 
-# Python wrapper
 cdef class PyDispatchRule:
     cdef DispatchRule* thisptr
 
@@ -252,50 +204,42 @@ cdef class PyDispatchRule:
     def setTypes(self, int ope_rule_type, int ma_rule_type):
         self.thisptr.setTypes(ope_rule_type, ma_rule_type)
 
-    def dispatchPairSPT(self, PyEnv env, double time,bint canwait):
-        """
-        调用 C++ DispatchRule 的 dispatchPairSPT 方法
-        """
-        cdef pair[int, int] result = self.thisptr.dispatchPairSPT(deref(env.thisptr), time,canwait)
+    def dispatchPairSPT(self, PyEnv env, double time, bint canwait):
+        cdef pair[int, int] result = self.thisptr.dispatchPairSPT(deref(env.thisptr), time, canwait)
         return (result.first, result.second)
 
-    def dispatchStep(self, PyEnv env, double time,bint canwait):
-        """
-        调用 C++ DispatchRule 的 dispatchStep 方法
-        """
+    def dispatchStep(self, PyEnv env, double time, bint canwait):
         cdef pair[int, int] result = self.thisptr.dispatchStep(deref(env.thisptr), time, canwait)
         return (result.first, result.second)
 
     def __dealloc__(self):
-        """
-        析构函数：释放 C++ 对象指针
-        """
         if self.thisptr:
             del self.thisptr
 
+
 def read_lines(str path):
     cdef vector[cpp_string] lines = readLinesFromFile(path.encode('utf-8'))
-    return [line.decode('utf-8') for line in lines]  # Convert to Python list
+    return [line.decode('utf-8') for line in lines]
 
-def run_greedy(PyEnv env, int ope_rule_type=1, int ma_rule_type=1, bint pairSPT=False, bint minComb=False, bint randomChoiceOpt=False,bint wait=False):
-    """
-    输入已有的 PyEnv 对象 env,执行 greedy 直到结束,返回 makespan。
+
+def run_greedy(PyEnv env, int ope_rule_type=1, int ma_rule_type=1,
+               bint pairSPT=False, bint minComb=False, bint randomChoiceOpt=False,
+               bint wait=False):
+    """Roll a greedy dispatching rule forward on ``env`` until it terminates.
+
+    Returns ``(action_list, final_makespan)``.
     """
     cdef double t
     cdef int ope, ma
-    cdef PyDispatchRule rule = PyDispatchRule(ope_rule_type, ma_rule_type, pairSPT,minComb,randomChoiceOpt)
+    cdef PyDispatchRule rule = PyDispatchRule(ope_rule_type, ma_rule_type,
+                                              pairSPT, minComb, randomChoiceOpt)
     cdef list action_list = []
-
-
     while not env.is_done():
         t = env.get_time()
-
-        result = rule.dispatchStep(env, t,wait)
+        result = rule.dispatchStep(env, t, wait)
         ope, ma = result[0], result[1]
         env.step(ope, ma)
         env.check_done()
         action_list.append((ope, ma))
-        print(ope,ma)
-
     return action_list, env.get_cur_makespan()
 

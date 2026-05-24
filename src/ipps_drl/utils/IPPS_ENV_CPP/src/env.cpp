@@ -34,7 +34,6 @@ Env::Env(const Env &other)
 {
     assert(&other != nullptr && "Source object is null!");
 
-    // 确保 lines 是有效的
     assert(!other.lines.empty() && "Lines in source object are empty!");
 
     std::cout << "Copy constructor called" << std::endl;
@@ -46,7 +45,6 @@ Env::Env(const Env &other)
     std::cout << "Job Argmin Comb size: " << job_argmin_comb.size() << std::endl;
 }
 
-// 拷贝赋值运算符
 Env &Env::operator=(const Env &other)
 {
     if (this != &other)

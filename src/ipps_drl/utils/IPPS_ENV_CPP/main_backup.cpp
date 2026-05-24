@@ -34,7 +34,7 @@ int main()
 
     for (int i = 0; i < sol_paths.size(); i++)
     {
-        auto start = std::chrono::high_resolution_clock::now(); // 开始计时
+        auto start = std::chrono::high_resolution_clock::now();
         vector<string> lines = readLinesFromFile(folder_path + "/problem/" + prob_paths[i]);
         State state = dealWithLines(lines);
         Env env(lines);
@@ -81,7 +81,7 @@ int main()
         }
         env.checkDone();
         cout << env.getCurMakespan() << endl;
-        auto end = std::chrono::high_resolution_clock::now(); // 结束计时
+        auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = end - start;
         std::cout << "Processing time for " << prob_paths[i] << ": " << elapsed.count() << " seconds" << std::endl;
     }

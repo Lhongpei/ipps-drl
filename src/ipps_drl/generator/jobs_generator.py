@@ -98,12 +98,12 @@ def DAGs_generate(mode = 'default', n = 10, max_out = 2,alpha = 1,beta = 1.0):
 
 
     ######################################create start node and exit node################################
-    for node,id in enumerate(into_degree):#给所有没有入边的节点添加入口节点作父亲
+    for node,id in enumerate(into_degree):
         if id ==0:
             edges.append((0,node+1))
             into_degree[node]+=1
 
-    for node,od in enumerate(out_degree):#给所有没有出边的节点添加出口节点作儿子
+    for node,od in enumerate(out_degree):
         if od ==0:
             edges.append((node+1,n+1))
             out_degree[node]+=1
@@ -191,12 +191,12 @@ def DAGs_generate_ratio(mode='default', n=10, max_out=2, max_in=None, alpha=1, b
         pred += len(dag_list_update[i])
 
     ######################################create start node and exit node################################
-    for node, id in enumerate(into_degree):  # 给所有没有入边的节点添加入口节点作父亲
+    for node, id in enumerate(into_degree):
         if id == 0:
             edges.append((0, node + 1))
             into_degree[node] += 1
 
-    for node, od in enumerate(out_degree):  # 给所有没有出边的节点添加出口节点作儿子
+    for node, od in enumerate(out_degree):
         if od == 0:
             edges.append((node + 1, n + 1))
             out_degree[node] += 1
@@ -207,25 +207,20 @@ def plot_DAG(edges, position,path, node_colors=None):
     g1 = nx.DiGraph()
     g1.add_edges_from(edges)
     
-    # 获取并打印原始节点列表
     original_nodes = list(g1.nodes())
 
     
-    # 按升序排列节点
     sorted_nodes = sorted(original_nodes)
 
-    # 确保 node_colors 的长度与排序后节点数量一致
+    # Ensure node_colors length matches the number of nodes after sorting.
     if node_colors is None or len(node_colors) != len(sorted_nodes):
         raise ValueError("The length of node_colors must match the number of sorted nodes")
     
-    # 创建从原始节点到排序后节点的映射
     mapping = {node: sorted_nodes.index(node) for node in original_nodes}
 
     
-    # 更新位置字典以匹配新节点标签
     new_position = {mapping[node]: pos for node, pos in position.items()}
     
-    # 重新映射颜色，使其按排序后的节点顺序排列
     sorted_node_colors = [node_colors[sorted_nodes.index(node)] for node in original_nodes]
  
     
@@ -234,7 +229,6 @@ def plot_DAG(edges, position,path, node_colors=None):
     plt.clf()
 
 def search_for_successors(node, edges):
-    # 这个函数应该返回node的直接后继节点
     successors = []
     for edge in edges:
         if edge[0] == node:
@@ -259,12 +253,7 @@ def search_for_all_successors(node, edges):
     return all_successors
 
 def search_for_predecessor(node, edges):
-    '''
-    寻找前继节点
-    :param node: 需要查找的节点id
-    :param edges: DAG边信息
-    :return: node的前继节点id列表
-    '''
+    """Return the predecessor node IDs of ``node`` in ``edges``."""
     map = {}
     if node == 'Start': return print("error, 'Start' node do not have predecessor!")
     for i in range(len(edges)):
@@ -282,12 +271,9 @@ def find_or_suc(dict_of_lists):
     or_node=set()
 
     
-    # 初始化一个空字典来记录全局的第一个元素和对应的第二个元素
     global_map = {}
     
-    # 遍历字典中的所有列表
     for key, lst in dict_of_lists.items():
-        # 初始化一个空字典来记录当前列表的第一个元素和对应的第二个元素
         local_map = {}
         
         for first, second in lst:
@@ -301,7 +287,6 @@ def find_or_suc(dict_of_lists):
                 global_map[first][second] = set()
             global_map[first][second].add(key)
     
-    # 检查全局字典中的冲突
     for first, seconds in global_map.items():
         if len(seconds) > 1:
             involved_keys = set()
@@ -313,7 +298,6 @@ def find_or_suc(dict_of_lists):
 
 
     
-    # 返回包含冲突的键
     return list(conflicting_keys),or_node
 def is_legal(node_dict,join_road_adict,edges,join,join_or):
     result_dict={}
@@ -322,7 +306,6 @@ def is_legal(node_dict,join_road_adict,edges,join,join_or):
     for node, values in node_dict.items():
         result_dict[node]={}
         a_dict[node]=set()
-        # 统计每个a出现的次数，并记录对应的(b)
         occurrence_count = {}
         unique_ab = {}
         for a, b in values:
@@ -333,9 +316,7 @@ def is_legal(node_dict,join_road_adict,edges,join,join_or):
                 occurrence_count[a] = 1
                 unique_ab[a] = set((a, b))
         
-        # 找出出现次数唯一的a
         unique_a = [k for k, v in occurrence_count.items() if v == 1]
-        # 如果有且仅有一个唯一的a，则将其对应的(a, b)加入新字典
         if len(unique_a)>1:
             print('hhh')
             return False
@@ -452,7 +433,6 @@ def generate_hierarchical_positions(edges, start_node, end_node, width=1., vert_
     G = nx.DiGraph()
     G.add_edges_from(edges)
     
-    # 计算每个节点的层次
     levels = {start_node: 0}
     dag_list = []
     queue = deque([start_node])
@@ -468,7 +448,6 @@ def generate_hierarchical_positions(edges, start_node, end_node, width=1., vert_
                 levels[neighbor] = level + 1
                 queue.append(neighbor)
     
-    # 生成层次布局
     dag_list_update = []
     position = {}
     max_pos = 0
@@ -478,11 +457,10 @@ def generate_hierarchical_positions(edges, start_node, end_node, width=1., vert_
         dag_list_update.append(dag_list[i])
         pos = 1
         for j in dag_list_update[i]:
-            position[j] = (pos, -3 * (i + 1))  # 交换x和y坐标，使其从上到下排列
+            position[j] = (pos, -3 * (i + 1))
             pos += 5
         max_pos = pos if pos > max_pos else max_pos
 
-    # 设置起始和结束节点的坐标
     position[start_node] = (max_pos / 2, 0)
     position[end_node] = (max_pos / 2, -3 * (length + 1))
     
@@ -539,22 +517,18 @@ def plot_newDAG(path,edges, node_colors,start_node, end_node):
     original_nodes = list(G.nodes())
 
     
-    # 按升序排列节点
     sorted_nodes = sorted(original_nodes)
 
-    # 确保 node_colors 的长度与排序后节点数量一致
+    # Ensure node_colors length matches the number of nodes after sorting.
     if node_colors is None or len(node_colors) != len(sorted_nodes):
         raise ValueError("The length of node_colors must match the number of sorted nodes")
     
-    # 创建从原始节点到排序后节点的映射
     mapping = {node: sorted_nodes.index(node) for node in original_nodes}
 
     
-    # 更新位置字典以匹配新节点标签
  
     new_position = {mapping[node]: pos for node, pos in position.items()}
     
-    # 重新映射颜色，使其按排序后的节点顺序排列
     sorted_node_colors = [node_colors[sorted_nodes.index(node)] for node in original_nodes]
     plt.figure(figsize=(15, 15))
     nx.draw_networkx(G, arrows=True, pos=new_position, node_color=sorted_node_colors,node_size=2000)
@@ -562,16 +536,7 @@ def plot_newDAG(path,edges, node_colors,start_node, end_node):
     plt.clf()
 
 def jobs_generator(mode='default',machine_range=(4,10),mas_p=0.5,or_p=0,or_num=3,ope=False,ope_num=10, ope_range=(4,20),total_ope_range=(10,100),time_range=(100,500),time_bias=(3,5),max_out=2, alpha=1, beta=1.0,road_num=3, ope_num_orpath=3,and_road_num=3,ope_num_andpath=3,and_p=0.3,save=False,path=None):
-    '''
-    随机生成一个DAG任务并随机分配它的持续时间和（CPU，Memory）的需求
-    :param mode: DAG按默认参数生成
-    :param n: DAG中任务数
-    :para max_out: DAG节点最大子节点数
-    :return: edges      DAG边信息
-             duration   DAG节点持续时间
-             demand     DAG节点资源需求数量
-             position   作图中的位置
-    '''
+    '''Generate a random DAG and per-node attributes (duration, resource demand, position).'''
 
 
     flag=True
@@ -664,7 +629,6 @@ def jobs_generator(mode='default',machine_range=(4,10),mas_p=0.5,or_p=0,or_num=3
 
                 for i,_ in or_road[operation].items():
                     selected_ope.add(or_road[operation][i][0])
-                # 计算没有被抽到的元素
 
                 not_selected_ope = list(set(edge_dict[operation]) - set(selected_ope))
                 strs=','.join([str(node_dict[i]) for i in selected_ope])
@@ -741,15 +705,7 @@ def jobs_generator(mode='default',machine_range=(4,10),mas_p=0.5,or_p=0,or_num=3
                 file.write(line + '\n')
 
     return lines
-            # file.write(job_info+'\n')
-            # for line in out_info:
-            #     file.write(line + '\n')
-            # for line in in_info:
-            #     file.write(line+'\n')
-            # for line in mas_ope:
-            #     file.write(line+'\n')
-        #plot_newDAG(path,edges, colors,0,super_end)
-    
+
 
 if __name__ == "__main__":
     
