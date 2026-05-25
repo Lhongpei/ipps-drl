@@ -14,7 +14,10 @@ private:
     State ori_state;
     double time;
     bool done;
-    vector<string> &lines;
+    // Owned copy. Stored by value (not reference) so an Env outlives the
+    // Python-side `cpp_lines` local that built it, and PyEnv.copy() yields an
+    // independent object safe to use from threads.
+    vector<string> lines;
     bool estimate_by_comb;
     double estimate_makespan;
     vector<vector<int>> job_argmin_comb;
@@ -55,6 +58,14 @@ public:
     State &getState()
     {
         return state;
+    }
+    // Lower-bound estimate of the final makespan from the current state, kept
+    // in sync by step(). Cheap to read — no recomputation. Used by MCTS as a
+    // C++-side substitute for the Python ``IPPSEnv.makespan_batch[0]`` cutoff
+    // check, so tree descent can skip the expensive Python ``env.step``.
+    double getEstimateMakespan() const
+    {
+        return estimate_makespan;
     }
     vector<vector<int>> &getJobArgminComb()
     {

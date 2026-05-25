@@ -66,6 +66,10 @@ def main() -> None:
                         help="UCT exploration constant")
     parser.add_argument("--use_kim_lb", action="store_true",
                         help="Use the hard-coded Kim benchmark lower bounds")
+    parser.add_argument("--strong", action="store_true",
+                        help="Enable strong-mode MCTS (AlphaZero PUCT + max-reward selection "
+                             "+ root Dirichlet noise + rollout cache). Recommended on hard "
+                             "instances; see ipps_drl/inference/mcts.py module docstring.")
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
@@ -100,6 +104,7 @@ def main() -> None:
                 time_limit=args.time_limit,
                 exploration=args.exploration,
                 lower_bound=lb,
+                strong=args.strong,
             )
             print(f"  {ckpt.name}  {prob.name}  "
                   f"makespan={result.makespan:.2f}  time={result.wall_time_s:.2f}s")

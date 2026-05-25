@@ -68,16 +68,17 @@ pair<int, int> DispatchRule::dispatchPairSPT(Env &env, double time, bool can_wai
         bool FLAG = false;
         if (this->minComb){
             int job_id = state.ope_job_scheduler.getOpeJob(ope);
-            bool flag = false;
-            for (int comb : state.ope_job_scheduler.getOpeComb(ope))
-            {
-                if(job_argmin_comb[job_id][0] == comb){
-                    flag = true;
-                    FLAG = true;
-                    break;
+            // A job with every comb pruned has no `job_argmin_comb[job_id][0]`
+            // to compare against — skip the minComb check for this ope.
+            if (!job_argmin_comb[job_id].empty()) {
+                for (int comb : state.ope_job_scheduler.getOpeComb(ope))
+                {
+                    if(job_argmin_comb[job_id][0] == comb){
+                        FLAG = true;
+                        break;
+                    }
                 }
             }
-            // if(!flag) continue;
         }
         const unordered_set<int> &feasible_mas = state.ope_ma_scheduler.getFeasibleMas(ope);
         unordered_set<int> select_mas;
@@ -134,12 +135,14 @@ pair<int, int> DispatchRule::dispatchPairSPT(Env &env, double time, bool can_wai
         if (this->minComb){
             int job_id = state.ope_job_scheduler.getOpeJob(ope);
             bool flag = false;
-            for (int comb : state.ope_job_scheduler.getOpeComb(ope))
-            {
-                if(job_argmin_comb[job_id][0] == comb){
-                    flag = true;
-                    FLAG = true;
-                    break;
+            if (!job_argmin_comb[job_id].empty()) {
+                for (int comb : state.ope_job_scheduler.getOpeComb(ope))
+                {
+                    if(job_argmin_comb[job_id][0] == comb){
+                        flag = true;
+                        FLAG = true;
+                        break;
+                    }
                 }
             }
             if(!flag) continue;
@@ -205,16 +208,34 @@ pair<int, int> DispatchRule::dispatchStep(Env &env, double time, bool can_wait)
     else if (this->ope_rule == MWKR)
     {
         double max_remain_time = -INF;
-        
+
         for (int ope : well_pre_opes)
         {
-            if (estimate_comb_remain_time[job_argmin_comb[state.ope_job_scheduler.getOpeJob(ope)][0]] > max_remain_time)
+            int job = state.ope_job_scheduler.getOpeJob(ope);
+            // A job whose combs were all pruned can't be ranked by remaining
+            // estimated work — fall through and let the post-loop fallback
+            // pick *some* ope, otherwise the rollout deadlocks on wait sentinels.
+            if (job_argmin_comb[job].empty())
+                continue;
+            double remain = estimate_comb_remain_time[job_argmin_comb[job][0]];
+            if (remain > max_remain_time)
             {
-                max_remain_time = estimate_comb_remain_time[job_argmin_comb[state.ope_job_scheduler.getOpeJob(ope)][0]];
+                max_remain_time = remain;
                 chosen_ope = ope;
             }
         }
+        // Every well-prep ope had empty argmin_comb — fall back to picking
+        // any feasible ope so the rollout makes progress.
+        if (chosen_ope == -1 && !well_pre_opes.empty())
+            chosen_ope = *well_pre_opes.begin();
     }
+    // Only wait when there's truly no ope to pick. Don't wait merely because a
+    // rule couldn't rank the candidates — that deadlocks (time advances, the
+    // same candidates resurface unrankable, repeat). The caller passes
+    // ``can_wait=false`` in rollouts for exactly this reason.
+    if (chosen_ope == -1)
+        return make_pair(-1, -1);
+
     if (this->ma_rule == SPT)
     {
         for (int ma : state.ope_ma_scheduler.getFeasibleMas(chosen_ope))
@@ -245,4 +266,29 @@ pair<int, int> DispatchRule::dispatchStep(Env &env, double time, bool can_wait)
     }
 
     return make_pair(chosen_ope, chosen_ma);
+}
+
+
+double runGreedyMakespan(Env &env,
+                         int ope_rule_type,
+                         int ma_rule_type,
+                         bool pairSPT,
+                         bool minComb,
+                         bool randomChoiceOpt,
+                         bool can_wait)
+{
+    DispatchRule rule(ope_rule_type, ma_rule_type, pairSPT, minComb, randomChoiceOpt);
+    try {
+        while (!env.isDone()) {
+            double t = env.getTime();
+            std::pair<int, int> action = rule.dispatchStep(env, t, can_wait);
+            env.step(action.first, action.second);
+            env.checkDone();
+        }
+        return env.getCurMakespan();
+    } catch (...) {
+        // Degenerate states (empty selection sets, etc.) — treat the rollout
+        // as the worst outcome rather than propagating into the MCTS thread.
+        return INF;
+    }
 }

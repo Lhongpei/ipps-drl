@@ -9,12 +9,18 @@
 #include <cassert>
 using namespace std;
 
-Env::Env(vector<string> &lines, bool estimate_by_comb) : state(dealWithLines(lines)), ori_state(state), time(0), done(false), lines(lines), estimate_by_comb(estimate_by_comb)
+Env::Env(vector<string> &lines, bool estimate_by_comb)
+    : state(dealWithLines(lines)),
+      ori_state(state),
+      time(0),
+      done(false),
+      lines(lines),
+      estimate_by_comb(estimate_by_comb)
 {
     if (estimate_by_comb)
         init_estimate_makespan();
-    std::cout << "Lines size when cunstructing: " << lines.size() << std::endl;
-};
+}
+
 Env::Env(const Env &other)
     : state(other.state),
       ori_state(other.ori_state),
@@ -32,17 +38,6 @@ Env::Env(const Env &other)
       old_estimate_job_end_time(other.old_estimate_job_end_time),
       old_estimate_comb_remain_time(other.old_estimate_comb_remain_time)
 {
-    assert(&other != nullptr && "Source object is null!");
-
-    assert(!other.lines.empty() && "Lines in source object are empty!");
-
-    std::cout << "Copy constructor called" << std::endl;
-
-    std::cout << "Time: " << time << std::endl;
-    std::cout << "Lines size: " << lines.size() << std::endl;
-    std::cout << "estimate_makespan: " << estimate_makespan << std::endl;
-
-    std::cout << "Job Argmin Comb size: " << job_argmin_comb.size() << std::endl;
 }
 
 Env &Env::operator=(const Env &other)
@@ -124,7 +119,14 @@ void Env::update_estimate_makespan(int job, bool has_comb_chage)
     for (int job = 0; job < job_num; job++)
     {
         double job_last_time = max(this->state.ope_job_scheduler.getJobLastTime(job), time);
-        estimate_job_end_time[job] = job_last_time + estimate_comb_remain_time[job_argmin_comb[job][0]];
+        // When every comb of `job` has been pruned (scheduleOpe's OR-peer logic
+        // can erase all entries in `job_to_comb[job]`), `job_argmin_comb[job]`
+        // becomes empty. Treat the job as having no remaining estimated work —
+        // its contribution to the makespan estimate is just its last finish time.
+        if (job_argmin_comb[job].empty())
+            estimate_job_end_time[job] = job_last_time;
+        else
+            estimate_job_end_time[job] = job_last_time + estimate_comb_remain_time[job_argmin_comb[job][0]];
     }
     estimate_makespan = *max_element(estimate_job_end_time.begin(), estimate_job_end_time.end());
 }

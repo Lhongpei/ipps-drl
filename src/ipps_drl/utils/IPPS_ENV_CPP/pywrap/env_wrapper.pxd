@@ -48,6 +48,7 @@ cdef extern from "env.h":
         void checkDone()
         bint isDone()
         double getCurMakespan()
+        double getEstimateMakespan() const
         double getTime()
         State& getState()
         void reset()
@@ -64,3 +65,7 @@ cdef extern from "greedy.h":
         void setTypes(int ope_rule_type, int ma_rule_type)
         pair[int, int] dispatchPairSPT(Env& env, double time, bint canwait)
         pair[int, int] dispatchStep(Env& env, double time, bint canwait)
+
+    double runGreedyMakespan(Env& env, int ope_rule_type, int ma_rule_type,
+                             bint pairSPT, bint minComb, bint randomChoiceOpt,
+                             bint can_wait) nogil

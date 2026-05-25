@@ -228,6 +228,13 @@ class InferenceEngine:
         exploration: float = 5.0,
         lower_bound: float = -1,
         return_schedule: bool = True,
+        strong: bool = False,
+        selection_mode: str | None = None,
+        puct_mode: str | None = None,
+        dirichlet_alpha: float | None = None,
+        dirichlet_eps: float | None = None,
+        cache_rollouts: bool | None = None,
+        parallel_rollouts: bool | None = None,
     ) -> InferenceResult:
         # MCTS needs the optional C++ wrapper. Import lazily so the rest of the
         # engine still works on machines that haven't built the extension.
@@ -261,6 +268,13 @@ class InferenceEngine:
             timeLimit=time_limit if iteration_limit is None else None,
             iterationLimit=iteration_limit,
             explorationConstant=exploration,
+            strong=strong,
+            selection_mode=selection_mode,
+            puct_mode=puct_mode,
+            dirichlet_alpha=dirichlet_alpha,
+            dirichlet_eps=dirichlet_eps,
+            cache_rollouts=cache_rollouts,
+            parallel_rollouts=parallel_rollouts,
         )
 
         wall_start = time.time()

@@ -25,6 +25,7 @@ cdef extern from "env.h":
         void checkDone()
         bint isDone()
         double getCurMakespan()
+        double getEstimateMakespan() const
         double getTime()
         State& getState()
         void reset()
@@ -36,6 +37,10 @@ cdef extern from "greedy.h":
         void setTypes(int ope_rule_type, int ma_rule_type)
         pair[int, int] dispatchPairSPT(Env& env, double time, bint canwait)
         pair[int, int] dispatchStep(Env& env, double time, bint canwait)
+
+    double runGreedyMakespan(Env& env, int ope_rule_type, int ma_rule_type,
+                             bint pairSPT, bint minComb, bint randomChoiceOpt,
+                             bint can_wait) nogil
 
 cdef extern from "state.h":
     cdef cppclass State:
@@ -133,11 +138,14 @@ cdef class PyEnv:
             "0 start",
             "1 end"
 ], bint is_eval=True):
+        # ``lines=None`` skips C++ allocation entirely. Used by ``copy()`` so it
+        # can install its own pointer without wasting an Env per call (which had
+        # nothing freeing it and was leaking ~5 Envs per MCTS rollout iteration).
+        if lines is None:
+            self.thisptr = NULL
+            return
         cdef vector[cpp_string] cpp_lines
         cdef bytes py_bytes
-        if lines is None:
-            self.thisptr = new Env(cpp_lines, is_eval)
-            return
         for line in lines:
             if not isinstance(line, str):
                 raise TypeError("Lines must be strings")
@@ -145,11 +153,16 @@ cdef class PyEnv:
             cpp_lines.push_back(cpp_string(<char*>py_bytes))
         self.thisptr = new Env(cpp_lines, is_eval)
 
+    def __dealloc__(self):
+        if self.thisptr != NULL:
+            del self.thisptr
+            self.thisptr = NULL
+
     def copy(self):
         """Return a new PyEnv that wraps a deep copy of the underlying C++ Env."""
         if not self.thisptr:
             raise ValueError("Attempting to copy an uninitialized PyEnv object")
-        cdef PyEnv new_env = PyEnv()
+        cdef PyEnv new_env = PyEnv(lines=None)
         new_env.thisptr = new Env(self.thisptr[0])
         return new_env
     def step(self, int ope, int mas):
@@ -176,6 +189,15 @@ cdef class PyEnv:
 
     def get_cur_makespan(self):
         return self.thisptr.getCurMakespan()
+
+    def get_estimate_makespan(self):
+        """Lower-bound makespan estimate from the current state.
+
+        Cheap: just returns the stored ``estimate_makespan`` field — updated
+        incrementally by ``step()``, no recomputation. Used by MCTS to do the
+        branch-cutoff check without paying for a Python ``env.step``.
+        """
+        return self.thisptr.getEstimateMakespan()
 
     def get_time(self):
 
@@ -227,7 +249,9 @@ def run_greedy(PyEnv env, int ope_rule_type=1, int ma_rule_type=1,
                bint wait=False):
     """Roll a greedy dispatching rule forward on ``env`` until it terminates.
 
-    Returns ``(action_list, final_makespan)``.
+    Returns ``(action_list, final_makespan)``. Uses the Python-side loop so the
+    action list can be returned; use :func:`run_greedy_makespan` for a faster
+    GIL-released variant that only returns the final makespan.
     """
     cdef double t
     cdef int ope, ma
@@ -242,4 +266,21 @@ def run_greedy(PyEnv env, int ope_rule_type=1, int ma_rule_type=1,
         env.check_done()
         action_list.append((ope, ma))
     return action_list, env.get_cur_makespan()
+
+
+def run_greedy_makespan(PyEnv env, int ope_rule_type=1, int ma_rule_type=1,
+                        bint pairSPT=False, bint minComb=False,
+                        bint randomChoiceOpt=False, bint wait=False):
+    """Roll greedy on ``env`` to terminal and return only the makespan.
+
+    The dispatch loop runs entirely in C++ with the GIL released — multiple
+    instances on independent ``PyEnv`` copies can therefore execute in parallel
+    from a Python ``ThreadPoolExecutor``. Mutates ``env`` to its terminal state.
+    """
+    cdef double makespan
+    cdef Env* env_ptr = env.thisptr
+    with nogil:
+        makespan = runGreedyMakespan(env_ptr[0], ope_rule_type, ma_rule_type,
+                                     pairSPT, minComb, randomChoiceOpt, wait)
+    return makespan
 
