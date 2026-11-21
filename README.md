@@ -1,10 +1,14 @@
 # IPPS-DRL
 
-![image](https://github.com/user-attachments/assets/af059719-088d-436c-ae32-34ae7b905fab)
+[![arXiv](https://img.shields.io/badge/arXiv-2409.00968-b31b1b.svg)](https://arxiv.org/abs/2409.00968)
+[![Production and Operations Management](https://img.shields.io/badge/Production_and_Operations_Management-Article-007396.svg)](https://journals.sagepub.com/doi/10.1177/10591478261505544)
+![GPU](https://img.shields.io/badge/Environment-GPU_Parallel-76B900)
 
-Official implementation of [*Solving Integrated Process Planning and Scheduling Problem via Graph Neural Network Based Deep Reinforcement Learning*](https://arxiv.org/abs/2409.00968).
+![IPPS-DRL overview](https://github.com/user-attachments/assets/af059719-088d-436c-ae32-34ae7b905fab)
 
-A GPU-parallel DRL environment for Integrated Process Planning and Scheduling (IPPS), with a heterogeneous-graph state, PPO / Behavior Cloning training, greedy dispatch rules, and OR-Tools / Gurobi MILP baselines. The environment also supports dynamic scenarios — adding jobs mid-schedule and changing processing times.
+Official repository for *Solving Integrated Process Planning and Scheduling Problem via Graph Neural Network Based Deep Reinforcement Learning* ([arXiv](https://arxiv.org/abs/2409.00968)) and its journal version, *A Learning and Searching Method for Integrated Process Planning and Scheduling*, published in [*Production and Operations Management*](https://journals.sagepub.com/doi/10.1177/10591478261505544).
+
+IPPS-DRL provides a GPU-parallel environment for solving Integrated Process Planning and Scheduling (IPPS) problems with graph neural networks and deep reinforcement learning. It combines heterogeneous-graph state representations with PPO and behavior cloning, alongside greedy dispatching rules and MILP baselines implemented with OR-Tools and Gurobi. The environment supports both static and dynamic scheduling, including new job arrivals and changes in processing times.
 
 ## Repository layout
 
